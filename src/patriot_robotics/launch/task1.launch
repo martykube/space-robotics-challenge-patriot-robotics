@@ -1,0 +1,11 @@
+<launch>
+
+  <include file="$(find srcsim)/launch/qual1.launch" pass_all_args="true"/>
+
+  <!-- image rectification for left and right cameras -->
+  <node pkg="image_proc" type="image_proc" name="image_proc_left" 
+  	ns="multisense/camera/left"/> 
+  <node pkg="image_proc" type="image_proc" name="image_proc_right" 
+	ns="multisense/camera/right"/> 
+
+</launch>

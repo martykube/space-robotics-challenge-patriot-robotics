@@ -8,4 +8,15 @@
   <node pkg="image_proc" type="image_proc" name="image_proc_right" 
 	ns="multisense/camera/right"/> 
 
+  <!-- LED detectors for left and right camera -->
+  <node pkg="patriot_robotics" type="led_detector_blob.py" 
+	name="led_detector_blob_left" ns="multisense/camera/left">
+    <remap from="image" to="image_rect_color"/>
+  </node>
+
+  <node pkg="patriot_robotics" type="led_detector_blob.py" 
+	name="led_detector_blob_right" ns="multisense/camera/right">
+    <remap from="image" to="image_rect_color"/>
+  </node>
+
 </launch>

@@ -73,7 +73,7 @@ def walkToDoor():
         msg.footstep_data_list[:] = []
         
     #-------------------------------------------------------------------------
-    # Finish by bring trailing foot up next to leading foot.
+    # Finish by bringing trailing foot up next to leading foot.
     #-------------------------------------------------------------------------
     if stepCounter % 2 == 0:
         msg.footstep_data_list.append(createFootStepOffset(LEFT, [STEP_OFFSET_MINOR, 0.0, 0.0]))

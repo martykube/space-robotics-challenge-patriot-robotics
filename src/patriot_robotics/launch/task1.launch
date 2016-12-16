@@ -5,10 +5,4 @@
   <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc"
   	ns="multisense/camera"/>
   
-  <!-- published fixed tf from world to camera for rviz -->
-  <node pkg="tf" type="static_transform_publisher"
-  	name="left_camera_static_transform_publisher" 
-	args="0 0 0 0 0 0 1 map left_camera_optical_frame 10"
-	/>
-
 </launch>

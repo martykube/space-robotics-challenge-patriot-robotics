@@ -3,11 +3,12 @@
 #=========================================================================================================
 # Imports
 #=========================================================================================================
-import rospy
-import time
 import tf
-import tf2_ros
+import time
 import numpy
+import rospy
+import tf2_ros
+import argparse
 
 from sensor_msgs.msg import LaserScan
 
@@ -35,11 +36,12 @@ RIGHT_FOOT_FRAME_NAME = None
 #=========================================================================================================
 # Supporting Methods
 #=========================================================================================================
-def walkToDoor():
+def walkToLocation(min_distance):
     global stepDistance
     msg = FootstepDataListRosMessage()
-    msg.transfer_time = 1.5
-    msg.swing_time = 1.5
+    # ----- Default Value: 1.5
+    msg.transfer_time = 0.6
+    msg.swing_time = 0.6
     msg.execution_mode = 0
     msg.unique_id = -1
 
@@ -56,9 +58,14 @@ def walkToDoor():
     msg.footstep_data_list[:] = []
 
     #---------------------------------------------------------------------------------
-    # Continue taking steps, alternating feet, until less that 0.75 meters from door.
+    # Continue taking steps, alternating feet, until less then the min_distance
+    # in meters from door.
+    #
+    # Qual #1 min_distance =  0.75
+    # Qual #2 min_distance = 2.0
     #---------------------------------------------------------------------------------
-    while RANGE_TO_WALL > 0.75:
+    rospy.loginfo('Minimum Distance From Wall: {0}'.format(min_distance))
+    while RANGE_TO_WALL > float(min_distance):
         if stepCounter % 2 == 0:
             msg.footstep_data_list.append(createFootStepOffset(LEFT, [STEP_OFFSET_MAJOR, 0.0, 0.0]))
             rospy.loginfo('Stepping Left')
@@ -73,7 +80,7 @@ def walkToDoor():
         msg.footstep_data_list[:] = []
         
     #-------------------------------------------------------------------------
-    # Finish by bringing trailing foot up next to leading foot.
+    # Finish by bring trailing foot up next to leading foot.
     #-------------------------------------------------------------------------
     if stepCounter % 2 == 0:
         msg.footstep_data_list.append(createFootStepOffset(LEFT, [STEP_OFFSET_MINOR, 0.0, 0.0]))
@@ -151,6 +158,14 @@ def footStepStatus_callback(msg):
 # Main
 #=========================================================================================================
 if __name__ == '__main__':
+    min_dist = 0.0
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--min_d', help='Minimum distance from an object that the robot should come.', default=1.0)
+    args = vars(parser.parse_args())
+    
+    if args['min_d']:
+        min_dist = args['min_d']
+        
     try:
         rospy.init_node('ihmc_walk_test')
         if not rospy.has_param('/ihmc_ros/robot_name'):
@@ -192,9 +207,9 @@ if __name__ == '__main__':
                     rate.sleep()
 
             #-------------------------------------------------------------------------
-            # Initiate walking towards door.
+            # Initiate walking forwards.
             #-------------------------------------------------------------------------
             if not rospy.is_shutdown():
-                walkToDoor()
+                walkToLocation(min_dist)
     except rospy.ROSInterruptException:
         pass

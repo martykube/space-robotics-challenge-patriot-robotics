@@ -1,0 +1,13 @@
+<launch>
+
+  <!-- launch file to run our nodes against a bag file instead of the simulation -->
+
+  <node pkg="patriot_robotics" type="qual1_image_proc.py" 
+	name="qual1_image_proc" ns="patriot_robotics">
+    <remap from="image" to="/multisense/camera/left/image_rect_color"/>
+  </node>
+
+  <node pkg="patriot_robotics" type="qual1_state.py" 
+	name="qual1_state" ns="patriot_robotics" />
+  
+</launch>

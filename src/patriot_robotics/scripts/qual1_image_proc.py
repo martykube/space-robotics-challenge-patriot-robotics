@@ -3,9 +3,11 @@
 import rospy
 import cv2
 import numpy as np
+
+from cv_bridge import CvBridge
+
 from sensor_msgs.msg import Image
-from geometry_msgs.msg import Point 
-from cv_bridge import CvBridge, CvBridgeError
+from geometry_msgs.msg import Point, PointStamped 
 from std_msgs.msg import Empty
 
 
@@ -27,7 +29,6 @@ class Qual1ImageProc:
     - led_annotated Debugging image for LED
     '''
 
-
     def __init__(self):        
         self.bridge = CvBridge()
         self.first_image = None
@@ -36,16 +37,16 @@ class Qual1ImageProc:
         rospy.Subscriber("image", Image, self.process_image)
 
         # Task start stop - big white screen
-        self.on_publisher = rospy.Publisher("on", Empty, queue_size = 10)
-        self.off_publisher = rospy.Publisher("off", Empty, queue_size = 10)
+        self.on_publisher = rospy.Publisher("on", Empty, queue_size = 20)
+        self.off_publisher = rospy.Publisher("off", Empty, queue_size = 20)
         self.on_off_annotated_publisher = rospy.Publisher(
-            "on_off_annotated", Image, queue_size = 2)
+            "on_off_annotated", Image, queue_size = 20)
 
         # LED detector
-        self.acquired_publisher = rospy.Publisher("acquired", Empty, queue_size = 10)
-        self.lost_publisher = rospy.Publisher("lost", Empty, queue_size = 10)
-        self.image_publisher =  rospy.Publisher("led_annotated", Image, queue_size = 2)
-        self.point_publisher =  rospy.Publisher("led_point", Point, queue_size = 10)
+        self.acquired_publisher = rospy.Publisher("acquired", Empty, queue_size = 20)
+        self.lost_publisher = rospy.Publisher("lost", Empty, queue_size = 20)
+        self.image_publisher =  rospy.Publisher("led_annotated", Image, queue_size = 20)
+        self.point_publisher =  rospy.Publisher("led_point", PointStamped, queue_size = 20)
 
 
     def process_image(self, image):
@@ -71,7 +72,7 @@ class Qual1ImageProc:
         if self.first_image is None:
             self.first_image = self.gray_pre_process(image)
             return
-
+            
         task_on = False
         img_bgr = self.bridge.imgmsg_to_cv2(image, desired_encoding="bgr8")
 
@@ -137,7 +138,7 @@ class Qual1ImageProc:
                 cy = int(M['m01']/M['m00'])
                 # OpenCV switches x and y for points.  Be careful here.
                 # We want:  origin top left, x right, y down
-                point = Point(x=cx, y=cy, z=0.)
+                point = PointStamped(header=image.header, point=Point(x=cx, y=cy, z=0.)) 
                 self.point_publisher.publish(point)
 
                 break

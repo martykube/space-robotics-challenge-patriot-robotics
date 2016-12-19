@@ -1,0 +1,15 @@
+One nice trick is speed developement is to work against a recording of the simultor instead of the simulator.  It's way faster.
+
+Run the simulator and record topics need as inputs to our nodes:
+
+rosbag record --duration=1m \
+/multisense/camera/left/image_rect_color \
+/multisense/camera/points2 \
+/tf \
+/tf_static
+
+
+Replay the bag 10 times faster than the simulation time.  When running the simulator simulation time is about 1/4 clock time on my box.  So this is 40x faster:
+
+rosbag play -r 10 2016-12-18-11-40-28.bag
+

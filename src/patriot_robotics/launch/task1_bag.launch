@@ -10,4 +10,10 @@
   <node pkg="patriot_robotics" type="qual1_state.py" 
 	name="qual1_state" ns="patriot_robotics" />
   
+  <node pkg="patriot_robotics" type="qual1_positon_estimate.py" 
+	name="qual1_positon_estimate" ns="patriot_robotics">
+    <remap from="led_image_location" to="led_point"/>
+    <remap from="stereo_camera_pointcloud" to="/multisense/camera/points2"/>
+  </node>
+  
 </launch>

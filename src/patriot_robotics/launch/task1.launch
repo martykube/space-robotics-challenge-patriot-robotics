@@ -2,7 +2,21 @@
 
   <include file="$(find srcsim)/launch/qual1.launch" pass_all_args="true"/>
 
-  <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image_proc"
-  	ns="multisense/camera"/>
+  <node pkg="stereo_image_proc" type="stereo_image_proc" 
+  	name="stereo_image_proc" ns="multisense/camera"/>
+
+  <node pkg="patriot_robotics" type="qual1_state.py" 
+	name="qual1_state" ns="patriot_robotics" />
+
+  <node pkg="patriot_robotics" type="qual1_image_proc.py" 
+	name="qual1_image_proc" ns="patriot_robotics">
+    <remap from="image" to="/multisense/camera/left/image_rect_color"/>
+  </node>
+
+  <node pkg="patriot_robotics" type="qual1_positon_estimate.py" 
+	name="qual1_positon_estimate" ns="patriot_robotics">
+    <remap from="led_image_location" to="led_point"/>
+    <remap from="stereo_camera_pointcloud" to="/multisense/camera/points2"/>
+  </node>
   
 </launch>

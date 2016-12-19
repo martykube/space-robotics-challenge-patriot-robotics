@@ -1,6 +1,6 @@
-One nice trick is speed developement is to work against a recording of the simultor instead of the simulator.  It's way faster.
+One nice trick to speed developement is to work against a recording of the simultor instead of the simulator.  It's way faster.
 
-Run the simulator and record topics need as inputs to our nodes:
+Run the simulator and record topics needed as inputs to our nodes:
 
 rosbag record --duration=1m \
 /multisense/camera/left/image_rect_color \

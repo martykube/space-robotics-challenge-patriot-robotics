@@ -6,7 +6,6 @@
   <node pkg="stereo_image_proc" type="stereo_image_proc" 
 	name="stereo_image_proc" ns="multisense/camera"/>
 
-  <include file="$(find patriot_robotics)/launch/task1_nodes.launch" 
-	   pass_all_args="true"/>
+  <include file="$(find patriot_robotics)/launch/task1_nodes.launch"/>
 
 </launch>

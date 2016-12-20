@@ -52,7 +52,7 @@ class Qual1PositionEstimate:
         (x, y, z, rgb) = list(gen)[0]
         if math.isnan(z):
             # we don't have a point in the point cloud here
-            rospy.loginfo('No point')
+            rospy.logwarn('No point in camera point cloud')
             return
         (r, g, b) = self.to_r_g_b(rgb)
         rospy.loginfo('raw (r, g, b) (%d, %d, %d)', r, g, b)
@@ -68,7 +68,8 @@ class Qual1PositionEstimate:
                 channel = 0
             colors.append(channel)
         (r, g, b) = colors
-        rospy.loginfo('Camera (x, y, z, r, g, b) (%f, %f, %f, %d, %d, %d)', x, y, z, r, g, b)
+        rospy.loginfo('Camera (x, y, z, r, g, b) (%f, %f, %f, %d, %d, %d)',
+                      x, y, z, r, g, b)
         
         #
         # translate frame from left_camera_optical_frame to head
@@ -78,7 +79,6 @@ class Qual1PositionEstimate:
         #
         # Camera optical frame coordinates are x right, y down, z ahead
         # Head frame coordinates are x ahead, y left, z up
-        # It appears to me that tf handles this correctly.  
         #
         # The depth channel is:
         # A large z value in the camera optical frame.        
@@ -93,7 +93,8 @@ class Qual1PositionEstimate:
         if not self.tf_buffer.can_transform(self.target_frame, 
                                              point_camera_frame.header.frame_id, 
                                              point_camera_frame.header.stamp):
-            rospy.loginfo('No transform')
+            rospy.logwarn('No transform')
+            return
 
         trans = self.tf_buffer.lookup_transform(
             self.target_frame,
@@ -118,7 +119,7 @@ class Qual1PositionEstimate:
 
     def to_r_g_b(self, rgb):
         '''
-        convert the PointCloud2 packed rgb into distinct ints in 0-255
+        convert the PointCloud2 packed rgb into distinct ints in [0-255]
         http://answers.ros.org/question/208834/read-colours-from-a-pointcloud2-python/
         http://wiki.ros.org/pcl/Overview
 
@@ -135,7 +136,7 @@ class Qual1PositionEstimate:
         pack = ctypes.c_uint32(i).value
         r = (pack & 0x00FF0000)>> 16
         g = (pack & 0x0000FF00)>> 8
-        b = (pack & 0x0000FF00)
+        b = (pack & 0x000000FF)
         return (r, g, b)
 
 

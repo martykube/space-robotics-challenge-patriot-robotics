@@ -38,24 +38,23 @@ class State:
             self.log_state()
 
     def led_3D_location(self, msg):
-        if not self.published_led:
-            (x, y, z) = (
-                msg.point_stamped.point.x,
-                msg.point_stamped.point.y,
-                msg.point_stamped.point.z)
-            # RGB values in range [0-1]
-            (r, g, b) = (
-                msg.color_rgba.r,
-                msg.color_rgba.g,
-                msg.color_rgba.b)
-            rospy.loginfo('Raw rgb %d %d %d', r, g, b)
-            (r, g, b) = (r / 255., g / 255., b / 255.)
-            rospy.loginfo('Scalled rgb %d %d %d', r, g, b)
+        (x, y, z) = (
+            msg.point_stamped.point.x,
+            msg.point_stamped.point.y,
+            msg.point_stamped.point.z)
+        # RGB values in range [0-1]
+        (r, g, b) = (
+            msg.color_rgba.r,
+            msg.color_rgba.g,
+            msg.color_rgba.b)
 
-            console_msg = Console(x=x, y=y, z=z, r=r, g=g, b=b)
-            self.console_publisher.publish(console_msg)
-            self.published_led = True
-            rospy.loginfo("Published LED")
+        # TODO missing [0-255] to [0-1] range conversion
+        rospy.loginfo('Publish LED (%f, %f, %f, %d %d %d)', x, y, z, r, g, b)
+        
+
+        console_msg = Console(x=x, y=y, z=z, r=r, g=g, b=b)
+        self.console_publisher.publish(console_msg)
+        self.published_led = True
 
     def log_state(self):
         rospy.loginfo('State is %s' % self.state)

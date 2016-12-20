@@ -105,21 +105,27 @@ class Qual1PositionEstimate:
             point_camera_frame,
             trans)
 
-        rospy.loginfo('Head (x, y, z, r, g, b) (%f, %f, %f, %d, %d, %d)', 
-                      point_head_frame.point.x, point_head_frame.point.y, 
-                      point_head_frame.point.z, 
-                      r, g, b)
-        # and publish
+        # Collect point and color and publish
+        color = ColorRGBA(r=r, g=g, b=b, a=1)
+        point = point_head_frame.point
         point_to_publish = PointStampedColorRGBA(
             point_stamped=point_head_frame,
-            color_rgba=ColorRGBA(r=r, g=g, b=b, a=1))
+            color_rgba=color)
+
+        rospy.loginfo('Head (x, y, z, r, g, b) (%f, %f, %f, %d, %d, %d)', 
+                      point_to_publish.point_stamped.point.x,
+                      point_to_publish.point_stamped.point.y,
+                      point_to_publish.point_stamped.point.z,
+                      point_to_publish.color_rgba.r,
+                      point_to_publish.color_rgba.g,
+                      point_to_publish.color_rgba.b)
 
         self.led_publisher.publish(point_to_publish)
 
 
     def to_r_g_b(self, rgb):
         '''
-        convert the PointCloud2 packed rgb into distinct ints in [0-255]
+        Convert the PointCloud2 packed rgb into distinct ints in [0-255]
         http://answers.ros.org/question/208834/read-colours-from-a-pointcloud2-python/
         http://wiki.ros.org/pcl/Overview
 
@@ -137,7 +143,9 @@ class Qual1PositionEstimate:
         r = (pack & 0x00FF0000)>> 16
         g = (pack & 0x0000FF00)>> 8
         b = (pack & 0x000000FF)
-        return (r, g, b)
+        ret = (r, g, b)
+        # rospy.loginfo("to_r_g_b tuple (%d, %d, %d)" % ret)
+        return ret
 
 
     def stereo_camera_pointcloud(self, pointcloud2):

@@ -6,9 +6,10 @@ import numpy as np
 
 from cv_bridge import CvBridge
 
-from sensor_msgs.msg import Image
-from geometry_msgs.msg import Point, PointStamped 
-from std_msgs.msg import Empty
+from sensor_msgs.msg import Image, RegionOfInterest
+from geometry_msgs.msg import Point
+from std_msgs.msg import Empty, ColorRGBA
+from patriot_robotics.msg import ImageBlob
 
 
 class Qual1ImageProc:
@@ -21,8 +22,7 @@ class Qual1ImageProc:
     Publishes:
     - acquired When LED is detected
     - lost when no LED is detected    
-    - on_off_annotated Debuging image for white screen detector
-    - led_location LED image coordinates
+    - led_image_location LED image coordinates
     - led_annotated Debugging image for LED
     '''
 
@@ -37,7 +37,8 @@ class Qual1ImageProc:
         self.acquired_publisher = rospy.Publisher("acquired", Empty, queue_size = 20)
         self.lost_publisher = rospy.Publisher("lost", Empty, queue_size = 20)
         self.image_publisher =  rospy.Publisher("led_annotated", Image, queue_size = 20)
-        self.point_publisher =  rospy.Publisher("led_point", PointStamped, queue_size = 20)
+        self.blob_publisher =  rospy.Publisher("led_image_location", 
+                                                ImageBlob, queue_size = 20)
 
     def process_image(self, image):
         '''
@@ -52,22 +53,24 @@ class Qual1ImageProc:
         green_mask = cv2.inRange(image_hsv, (59, 127, 127), (61, 255, 255))
         red_mask = cv2.inRange(image_hsv, (0, 127, 127), (1, 255, 255))
 
-        image_with_contours = None
         acquired = False
 
-        for mask in (blue_mask, green_mask, red_mask):
-            contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, 
+        masks = (red_mask, green_mask, blue_mask)
+        color = [0, 0, 0]
+        for i in range(len(masks)):
+            contours, hierarchy = cv2.findContours(masks[i], cv2.RETR_TREE, 
                                                    cv2.CHAIN_APPROX_SIMPLE)
 
             # if we find a contour, use it...
             if len(contours) > 0:
+
+                rospy.loginfo('Led detected')
                 acquired = True
+                color[i] = 255
+                rospy.loginfo("Color %s", color)
 
                 # publish annotated image
                 cv2.drawContours(cv2_img_bgr, contours, 0, (20, 255, 57), 3)
-                ros_img_contours = self.bridge.cv2_to_imgmsg(cv2_img_bgr, 
-                                                             encoding="bgr8")
-                self.image_publisher.publish(ros_img_contours)
 
                 # publish center of contour
                 M = cv2.moments(contours[0])
@@ -75,15 +78,32 @@ class Qual1ImageProc:
                 cy = int(M['m01']/M['m00'])
                 # OpenCV switches x and y for points.  Be careful here.
                 # We want:  origin top left, x right, y down
-                point = PointStamped(header=image.header, point=Point(x=cx, y=cy, z=0.)) 
-                self.point_publisher.publish(point)
+                rospy.loginfo("Centroid (%d, %d)", cx, cy)
 
+                # publish bounding rectable
+                rect = cv2.boundingRect(contours[0])
+                rospy.loginfo('Bounding Rect %s', rect)
+
+                image_blob = ImageBlob(header=image.header,
+                                       color=ColorRGBA(r=color[0], g=color[1], 
+                                                       b=color[2], a=1.0),
+                                       centroid=Point(x=cx, y=cy),
+                                       bounding_rectangle=RegionOfInterest(
+                                           x_offset = rect[0],
+                                           y_offset = rect[1],
+                                           width = rect[2],
+                                           height = rect[3]
+                                       ))
+                self.blob_publisher.publish(image_blob)
                 break
 
         if acquired:
             self.acquired_publisher.publish(Empty())
         else:
             self.lost_publisher.publish(Empty())
+
+        ros_img_contours = self.bridge.cv2_to_imgmsg(cv2_img_bgr, encoding="bgr8")
+        self.image_publisher.publish(ros_img_contours)
 
 
 if __name__ == '__main__':

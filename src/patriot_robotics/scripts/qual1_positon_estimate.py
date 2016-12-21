@@ -3,6 +3,8 @@
 import struct
 import ctypes
 import math
+import numpy as np
+from scipy import stats
 
 import rospy
 import tf2_ros as tf
@@ -12,7 +14,7 @@ import sensor_msgs.point_cloud2 as pc2
 from geometry_msgs.msg import Point, PointStamped 
 from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import ColorRGBA
-from patriot_robotics.msg import PointStampedColorRGBA
+from patriot_robotics.msg import PointStampedColorRGBA, ImageBlob
 
 
 class Qual1PositionEstimate:
@@ -31,7 +33,7 @@ class Qual1PositionEstimate:
 
     def __init__(self):
         rospy.Subscriber("led_image_location", 
-                         PointStamped, self.led_image_location)
+                         ImageBlob, self.led_image_location)
         self.pointcloud = None
         rospy.Subscriber("stereo_camera_pointcloud", 
                          PointCloud2, self.stereo_camera_pointcloud)
@@ -43,23 +45,11 @@ class Qual1PositionEstimate:
         self.tf_listener = tf.TransformListener(self.tf_buffer)
         self.target_frame = 'head'
 
-
-    def led_image_location(self, point_stamped):
-        # read the point cloud at the image position
-        u, v = int(point_stamped.point.x), int(point_stamped.point.y)
-        rospy.loginfo('led_image_location (%f, %f)', u, v) 
-        gen = pc2.read_points(self.pointcloud, uvs=((u, v), ))
-        (x, y, z, rgb) = list(gen)[0]
-        if math.isnan(z):
-            # we don't have a point in the point cloud here
-            rospy.logwarn('No point in camera point cloud')
-            return
-        (r, g, b) = self.to_r_g_b(rgb)
-        rospy.loginfo('raw (r, g, b) (%d, %d, %d)', r, g, b)
+    def threshold_rgb(self, rgb_tuple):
         # fixup values to be a pure red, green, or blue
         # set out of range to 0 and threshold at 127 to 0 or 255
         colors = []
-        for channel in (r, g, b):
+        for channel in rgb_tuple:
             if channel < 0 or channel > 255:
                 channel = 0
             if channel > 127:
@@ -67,10 +57,82 @@ class Qual1PositionEstimate:
             if channel < 127:
                 channel = 0
             colors.append(channel)
+        return colors
+
+    def centroid_location(self, image_blob):
+        '''
+        Read the point cloud at the image cetroid
+        '''
+        u, v = int(image_blob.centroid.x), int(image_blob.centroid.y)
+        rospy.loginfo('led_image_location (%f, %f)', u, v) 
+        gen = pc2.read_points(self.pointcloud, uvs=((u, v), ))
+        (x, y, z, rgb) = list(gen)[0]
+        if math.isnan(z):
+            # we don't have a point in the point cloud here
+            return None
+        (r, g, b) = self.to_r_g_b(rgb)
+        rospy.loginfo('raw (r, g, b) (%d, %d, %d)', r, g, b)
         (r, g, b) = colors
-        rospy.loginfo('Camera (x, y, z, r, g, b) (%f, %f, %f, %d, %d, %d)',
-                      x, y, z, r, g, b)
         
+        ret = (x, y, z, r, g, b) 
+        rospy.loginfo(
+            'Centroid in camera frame  (x, y, z, r, g, b) (%f, %f, %f, %d, %d, %d)' %
+            ret)
+        return ret
+
+    def blob_location(self, image_blob):
+        '''
+        Read the cloud at all of the points in a bounding rectangle
+        '''
+        # make sure we have a point cloud
+        if self.pointcloud is None:
+            rospy.loginfo('No point cloud')
+            return None
+
+        # read the point cloud at the image position
+        rect = image_blob.bounding_rectangle
+        (x, y, width, height) = (rect.x_offset, rect.y_offset, rect.width, rect.height)
+        # query for all points in rectangle
+        uvs = []
+        for dx in range(width):
+            for dy in range(height):
+                uvs.append((x + dx, y + dy))
+
+        gen = pc2.read_points(self.pointcloud, uvs=uvs)
+        points = list(gen)
+        rospy.loginfo("Read %d points", len(points))
+        
+        valid_points = []
+        for point in points:
+            (x, y, z, rgb) = point
+            if not math.isnan(z):
+                (r, g, b) = self.to_r_g_b(rgb)
+                (r, g, b) = self.threshold_rgb((r, g, b))
+                valid_points.append((x, y, z, r, g, b))
+        rospy.loginfo('Valid points %d', len(valid_points))
+        
+        valid_points = np.array(valid_points)
+
+        # average spatial location
+        location_mean = np.mean(valid_points[:, 0:3], axis=0)
+
+        # most frequent color
+        color_mode = stats.mode(valid_points[:, 3:6], axis=0)[0].flatten().astype(int)
+
+        ret = (location_mean[0], location_mean[1], location_mean[2], 
+               color_mode[0], color_mode[1], color_mode[2])
+        rospy.loginfo('ret %s', ret)
+
+        return ret
+
+    def led_image_location(self, image_blob):
+        
+        loc = self.blob_location(image_blob)
+        if loc is None:
+            rospy.logwarn('Could not find average in point cloud')
+            return
+        (x, y, z, r, g, b) = loc  
+
         #
         # translate frame from left_camera_optical_frame to head
         #
@@ -88,7 +150,7 @@ class Qual1PositionEstimate:
         # camera is installed upside down. 
         #
         point_camera_frame = PointStamped(point=Point(x=x, y=x, z=z), 
-                                          header=point_stamped.header)
+                                          header=image_blob.header)
         # check for transform
         if not self.tf_buffer.can_transform(self.target_frame, 
                                              point_camera_frame.header.frame_id, 
@@ -107,7 +169,6 @@ class Qual1PositionEstimate:
 
         # Collect point and color and publish
         color = ColorRGBA(r=r, g=g, b=b, a=1)
-        point = point_head_frame.point
         point_to_publish = PointStampedColorRGBA(
             point_stamped=point_head_frame,
             color_rgba=color)

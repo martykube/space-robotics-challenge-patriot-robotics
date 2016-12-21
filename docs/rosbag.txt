@@ -3,8 +3,10 @@ One nice trick to speed developement is to work against a recording of the simul
 Run the simulator and record topics needed as inputs to our nodes:
 
 rosbag record --duration=1m \
-/multisense/camera/left/image_rect_color \
-/multisense/camera/points2 \
+/multisense/camera/left/image_raw \
+/multisense/camera/left/camera_info \
+/multisense/camera/right/image_raw \
+/multisense/camera/right/camera_info \
 /tf \
 /tf_static
 
@@ -12,4 +14,6 @@ rosbag record --duration=1m \
 Replay the bag 10 times faster than the simulation time.  When running the simulator simulation time is about 1/4 clock time on my box.  So this is 40x faster:
 
 rosbag play -r 10 2016-12-18-11-40-28.bag
+
+To run our nodes without the simulation use task1_nodes.launch
 

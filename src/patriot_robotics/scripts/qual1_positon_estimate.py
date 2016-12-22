@@ -41,6 +41,9 @@ class Qual1PositionEstimate:
         self.led_publisher = rospy.Publisher("led_3D_location", 
                                             PointStampedColorRGBA, queue_size = 20)
 
+        # location in camera optical frame
+        self.led_publisher_camera = rospy.Publisher("led_3D_location_camera", 
+                                                    PointStampedColorRGBA, queue_size = 20)
         self.tf_buffer = tf.Buffer()
         self.tf_listener = tf.TransformListener(self.tf_buffer)
         self.target_frame = 'head'
@@ -133,6 +136,15 @@ class Qual1PositionEstimate:
             return
         (x, y, z, r, g, b) = loc  
 
+        point_camera_frame = PointStamped(
+            point=Point(x=x, y=y, z=z), 
+            header=image_blob.header)
+
+        # Publish points in camera optical frame for debugging
+        self.led_publisher_camera.publish(
+            PointStampedColorRGBA(
+                point_stamped=point_camera_frame,
+                color_rgba=ColorRGBA(r=r, g=g, b=b, a=1)))
         #
         # translate frame from left_camera_optical_frame to head
         #
@@ -149,8 +161,6 @@ class Qual1PositionEstimate:
         # Also expect sign change on the image plane coordinates as the
         # camera is installed upside down. 
         #
-        point_camera_frame = PointStamped(point=Point(x=x, y=x, z=z), 
-                                          header=image_blob.header)
         # check for transform
         if not self.tf_buffer.can_transform(self.target_frame, 
                                              point_camera_frame.header.frame_id, 

@@ -3,8 +3,10 @@
 
 import rospy
 from std_msgs.msg import Empty
-from patriot_robotics.msg import PointStampedColorRGBA
 from srcsim.msg import Console
+
+from patriot_robotics.msg import PointStampedColorRGBA
+
 
 class State:
     '''
@@ -18,7 +20,6 @@ class State:
         rospy.Subscriber('lost', Empty, self.lost)
         rospy.Subscriber('led_3D_location', PointStampedColorRGBA, 
                                                self.led_3D_location)
-        
         self.console_publisher = rospy.Publisher("/srcsim/qual1/light", 
                                             Console, queue_size = 20)
         self.seeking = 'seeking'
@@ -41,7 +42,6 @@ class State:
             if self.acquired_count > self.max_acquired_count and not self.published_led:
                 self.publish_fallback()
                 
-
     def lost(self, msg):
         if self.state == self.tracking:
             self.state = self.seeking
@@ -53,10 +53,8 @@ class State:
             self.log_state()
 
     def led_3D_location(self, msg):
-
         if self.published_led:
             return
-
         (x, y, z, r, g, b) = (
             msg.point_stamped.point.x,
             msg.point_stamped.point.y,
@@ -64,13 +62,10 @@ class State:
             msg.color_rgba.r,
             msg.color_rgba.g,
             msg.color_rgba.b)
-
         if r < 255 and g < 255 and b < 255:
             rospy.logwarn('No color %d %d %d', r, g, b)
             return
-
         (r, g, b) = (r / 255.0, g / 255.0, b / 255.0)
-
         self.publish_console_msg(x, y, z, r, g, b)
 
     def publish_fallback(self):
@@ -85,6 +80,7 @@ class State:
 
     def log_state(self):
         rospy.loginfo('State is %s', self.state)
+
         
 if __name__ == '__main__':
     rospy.init_node('qual1_state')

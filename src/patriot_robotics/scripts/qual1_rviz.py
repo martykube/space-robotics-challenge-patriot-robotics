@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 
+
 import rospy
+
 from srcsim.msg import Console
 from visualization_msgs.msg import Marker 
 from geometry_msgs.msg import  Point, Vector3
 from std_msgs.msg import ColorRGBA, Header
+
 from patriot_robotics.msg import PointStampedColorRGBA
+
 
 class Qual1Rviz:
     '''

@@ -206,7 +206,7 @@ def calc_min_range(dataPoints):
     sortedPoints = sorted(dataPoints)
     ndx = 0
     min_range = sortedPoints[ndx]
-    while min_range < min_outlier:
+    while min_range <= min_outlier:
         ndx += 1
         min_range = sortedPoints[ndx]
         

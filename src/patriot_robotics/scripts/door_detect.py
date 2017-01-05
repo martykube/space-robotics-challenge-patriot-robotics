@@ -12,6 +12,7 @@ class Door_Detector:
 		self.image_sub = rospy.Subscriber('multisense/camera/left/image_raw',
 						  Image, self.image_callback)
 		self.door_centroid_pub = rospy.Publisher('DoorCentroid', Point, queue_size=10)
+		self.door_match_pub = rospy.Publisher('DoorMatchImage', Image, queue_size=5)
 
 	def image_callback(self, msg):
 		# get the image retrieved from the message
@@ -51,9 +52,6 @@ class Door_Detector:
 				cx = int(M['m10']/M['m00'])
 				cy = int(M['m01']/M['m00'])
 
-				# publish the centroid
-				centroid = Point(cx, cy, 0)
-				self.door_centroid_pub.publish(centroid)
 
 				# draw the center of mass in the image
 				#cv2.circle(image, (cx, cy), 5, (0, 255, 0), 10)
@@ -96,9 +94,16 @@ class Door_Detector:
 			matches = sorted(matches, key = lambda x:x.distance)
 	
 			# Draw first 10 matches
-			img3 = self.drawMatches(gray_template, kp1, gray, kp2, matches[:10])
+			img3, x2, y2 = self.drawMatches(gray_template, kp1, gray, kp2, matches[:1])
 
-			plt.imshow(img3), plt.show()
+			# publish the centroid
+			centroid = Point(x2, y2, 0)
+			self.door_centroid_pub.publish(centroid)
+
+			img3_msg = self.bridge.cv2_to_imgmsg(img3, "bgr8")
+			self.door_match_pub.publish(img3_msg)
+			
+#			plt.imshow(img3), plt.show()
 
 		# display the new image
 #		plt.subplot(121), plt.imshow(image)
@@ -146,7 +151,7 @@ class Door_Detector:
 			# colour blue
 			cv2.line(out, (int(x1), int(y1)), (int(x2) + cols1, int(y2)), (255, 0, 0), 1)
 
-		return out
+		return out, x2, y2
 
 rospy.init_node('door_detector')
 door_detector = Door_Detector()

@@ -56,6 +56,8 @@ if __name__ == '__main__':
             rospy.loginfo('waiting for subscriber...')
             while armTrajectoryPublisher.get_num_connections() == 0:
                 rate.sleep()
+	
+	rospy.loginfo('Subscriber found.')
 
         if not rospy.is_shutdown():
             sendRightArmTrajectory()

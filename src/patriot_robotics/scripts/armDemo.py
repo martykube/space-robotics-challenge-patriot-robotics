@@ -49,7 +49,7 @@ if __name__ == '__main__':
         armTrajectoryPublisher = rospy.Publisher("/ihmc_ros/{0}/control/arm_trajectory".format(ROBOT_NAME), ArmTrajectoryRosMessage, queue_size=1)
 
         rate = rospy.Rate(10) # 10hz
-        time.sleep(1)
+        time.sleep(1) 
 
         # make sure the simulation is running otherwise wait
         if armTrajectoryPublisher.get_num_connections() == 0:

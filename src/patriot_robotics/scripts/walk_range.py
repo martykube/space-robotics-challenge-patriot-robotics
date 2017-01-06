@@ -46,11 +46,30 @@ def walkToLocation(min_distance):
     msg.unique_id = -1
 
     stepCounter = 0
+
+    #-------------------------------------------------------------------------
+    # Separate the feet slightly so that we can go faster with less chance of
+    # foot collisions.
+    #-------------------------------------------------------------------------
+    rospy.loginfo('Separating feet...') 
+    footSeparation = 0.07  
+ 
+    msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion()
+    stepCounter += 1
+    msg.footstep_data_list[:] = []
     
+    msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion()
+    stepCounter += 1
+    msg.footstep_data_list[:] = []
+
     #-------------------------------------------------------------------------
     # Takes the initial step using the left foot first.
     #-------------------------------------------------------------------------
-    rospy.loginfo('Taking initial step...')
+    rospy.loginfo('Taking initial forward fstep...')
     msg.footstep_data_list.append(createFootStepOffset(LEFT, [STEP_OFFSET_MINOR, 0.0, 0.0]))
     footStepListPublisher.publish(msg)
     waitForFootstepCompletion()

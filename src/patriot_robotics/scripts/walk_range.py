@@ -46,11 +46,30 @@ def walkToLocation(min_distance):
     msg.unique_id = -1
 
     stepCounter = 0
+
+    #-------------------------------------------------------------------------
+    # Separate the feet slightly so that we can go faster with less chance of
+    # foot collisions.
+    #-------------------------------------------------------------------------
+    rospy.loginfo('Separating feet...') 
+    footSeparation = 0.07  
+ 
+    msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion()
+    stepCounter += 1
+    msg.footstep_data_list[:] = []
     
+    msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion()
+    stepCounter += 1
+    msg.footstep_data_list[:] = []
+
     #-------------------------------------------------------------------------
     # Takes the initial step using the left foot first.
     #-------------------------------------------------------------------------
-    rospy.loginfo('Taking initial step...')
+    rospy.loginfo('Taking initial forward fstep...')
     msg.footstep_data_list.append(createFootStepOffset(LEFT, [STEP_OFFSET_MINOR, 0.0, 0.0]))
     footStepListPublisher.publish(msg)
     waitForFootstepCompletion()
@@ -139,6 +158,78 @@ def waitForFootstepCompletion():
     stepComplete = False
     while not stepComplete:
         rate.sleep()
+
+#---------------------------------------------------------------------------
+# The following code supports finding a statistically valid minimum
+# range to obsticle by calculating outliers based on the complete data set.
+#---------------------------------------------------------------------------
+def calc_min_outlier(dataPoints):
+    Q1 = quartiles(dataPoints)[0]
+    Q3 = quartiles(dataPoints)[1]  
+    IQR = (Q3 - Q1) * 1.5
+    min_outlier = Q1 - IQR
+    max_outlier = Q3 + IQR
+    
+    return min_outlier, max_outlier
+
+
+def median(dataPoints):
+    """
+    the median of given data
+    Arguments:
+        dataPoints: a list of data points, int or float
+    Returns:
+        the middle number in the sorted list, a float or an int
+    """
+    if not dataPoints:
+        raise StatsError('no data points passed')
+        
+    sortedPoints = sorted(dataPoints)
+    mid = len(sortedPoints) // 2  # uses the floor division to have integer returned
+    if (len(sortedPoints) % 2 == 0):
+        # even
+        return (sortedPoints[mid-1] + sortedPoints[mid]) / 2.0
+    else:
+        # odd
+        return sortedPoints[mid]
+
+
+def quartiles(dataPoints):
+    """
+    the lower and upper quartile
+    Arguments:
+        dataPoints: a list of data points, int or float
+    Returns:
+        the first and the last quarter in the sorted list, a tuple of float or int
+    """
+    if not dataPoints:
+        raise StatsError('no data points passed')
+        
+    sortedPoints = sorted(dataPoints)
+    mid = len(sortedPoints) // 2 # uses the floor division to have integer returned
+    
+    if (len(sortedPoints) % 2 == 0):
+        # even
+        lowerQ = median(sortedPoints[:mid])
+        upperQ = median(sortedPoints[mid:])
+    else:
+        # odd
+        lowerQ = median(sortedPoints[:mid])
+        upperQ = median(sortedPoints[mid+1:])
+            
+    return (lowerQ, upperQ)
+
+
+def calc_min_range(dataPoints):
+    min_outlier = calc_min_outlier(dataPoints)[0]
+    sortedPoints = sorted(dataPoints)
+    ndx = 0
+    min_range = sortedPoints[ndx]
+    while min_range <= min_outlier:
+        ndx += 1
+        min_range = sortedPoints[ndx]
+        
+    return min_range
 
 
 #=========================================================================================================

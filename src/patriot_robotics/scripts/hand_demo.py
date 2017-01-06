@@ -60,6 +60,7 @@ def sendRightHandTrajectory():
     rospy.loginfo('publishing second right hand trajectory')
     handTrajectoryPublisher.publish(msg)
 
+    time.sleep(5)
 
 # Get current position and orientation of the hand in world frame as a SE3TrajectoryPointRosMessage
 def getCurrentPosition(stepSide):

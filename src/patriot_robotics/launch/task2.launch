@@ -1,7 +1,7 @@
 <launch>
 
-  <!-- use init:=true as command line argument -->
-  <include file="$(find srcsim)/launch/qual2.launch" 
-	   pass_all_args="true"/>
+  <include file="$(find srcsim)/launch/qual2.launch" pass_all_args="true">
+    <arg name="init" default="true"/>
+  </include>
 
 </launch>

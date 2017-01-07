@@ -102,7 +102,7 @@ if __name__ == '__main__':
         handTrajectoryPublisher = rospy.Publisher(handTrajectoryPublisherName, HandTrajectoryRosMessage, queue_size=1)
 
         tfBuffer = tf2_ros.Buffer()
-        tfListener = tf2_ros.TransformListener(tfBuffer)
+        tf2_ros.TransformListener(tfBuffer)
 
         rate = rospy.Rate(10) # 10hz
         time.sleep(1) 

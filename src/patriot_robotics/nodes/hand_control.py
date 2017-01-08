@@ -7,8 +7,8 @@ import tf
 import tf2_ros
 import math
 import numpy
-import std_msgs
-import geometry_msgs
+
+from geometry_msgs.msg import Vector3
 
 from ihmc_msgs.msg import HandTrajectoryRosMessage
 from ihmc_msgs.msg import HandDesiredConfigurationRosMessage
@@ -18,7 +18,6 @@ from patriot_robotics.msg import ButtonPressMessage
 
 from math import cos, sin
 
-# Utility function for quaternion multiplication (probably ROS has a verison somewhere..)
 # http://stackoverflow.com/questions/4870393/rotating-coordinate-system-via-a-quaternion
 
 class HandControl:
@@ -100,6 +99,8 @@ class HandControl:
 
         trajectory = SE3TrajectoryPointRosMessage()
         trajectory.position = in_msg.button_position
+        trajectory.linear_velocity = Vector3(0, 0, 0)
+        trajectory.angular_velocity = Vector3(0, 0, 0)
 
         '''
         Set palm parallel to y-z world plane, with fingers going right (or left)
@@ -122,6 +123,9 @@ class HandControl:
         q2 = tf.transformations.quaternion_about_axis(numpy.pi/2, y_axis_unit)
 
         q = tf.transformations.quaternion_multiply(q1, q2)
+
+        # TESTING ONLY set to identity quaternion
+        # q = [0, 0, 0, 1] 
 
         # this orientation IS a quaternion, in message definition
         trajectory.orientation.x = q[0]

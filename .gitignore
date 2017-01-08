@@ -1,4 +1,4 @@
-/src/patriot_robotics/scripts/hand_demo.pyc
+*.pyc
 build
 devel
 .catkin_workspace

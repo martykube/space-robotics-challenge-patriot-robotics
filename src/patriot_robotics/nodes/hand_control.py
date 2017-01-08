@@ -5,6 +5,7 @@ import time
 import rospy
 import tf
 import tf2_ros
+import math
 import numpy
 import std_msgs
 import geometry_msgs
@@ -15,16 +16,10 @@ from ihmc_msgs.msg import SE3TrajectoryPointRosMessage
 
 from patriot_robotics.msg import ButtonPressMessage
 
-# Utility function for quaternion multiplication (probably ROS has a verison somewhere..)
-def q_mult(q1, q2):
-    x1, y1, z1, w1 = q1
-    x2, y2, z2, w2 = q2
-    w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
-    x = w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2
-    y = w1 * y2 + y1 * w2 + z1 * x2 - x1 * z2
-    z = w1 * z2 + z1 * w2 + x1 * y2 - y1 * x2
+from math import cos, sin
 
-    return w, x, y, z
+# Utility function for quaternion multiplication (probably ROS has a verison somewhere..)
+# http://stackoverflow.com/questions/4870393/rotating-coordinate-system-via-a-quaternion
 
 class HandControl:
     '''
@@ -54,10 +49,7 @@ class HandControl:
         # trajectoryPublisherName = "/ihmc_ros/valkyrie/control/hand_trajectory"
         self.trajectoryPublisher = rospy.Publisher("trajectoryPublisher", 
             HandTrajectoryRosMessage, queue_size=1)
-
-        self.tfBuffer = tf2_ros.Buffer()
-        tf2_ros.TransformListener(self.tfBuffer)
-    
+   
     '''
     Push a button. The button is assumed to be in the y-z plane so the palm will be oriented
     accordingly.
@@ -91,15 +83,16 @@ class HandControl:
             rospy.loginfo("Using left hand to press button.")
         else:
             msg.robot_side = HandTrajectoryRosMessage.RIGHT
-            rospy.loginfo("Using right hand to press button.")
             hand_frame = self.RIGHT_HAND_FRAME_NAME
-
+            rospy.loginfo("Using right hand to press button.")
+ 
         # remember where we started
         start_trajectory = SE3TrajectoryPointRosMessage()     
-        hand_world = self.tfBuffer.lookup_transform('world', hand_frame, rospy.Time())
+        hand_world = tfBuffer.lookup_transform('world', hand_frame, rospy.Time())
         start_trajectory.orientation = hand_world.transform.rotation
         start_trajectory.position = hand_world.transform.translation
         rospy.loginfo('starting hand position, in world: {0}'.format(start_trajectory.position))
+        rospy.loginfo('starting hand orientation, in world: {0}'.format(start_trajectory.orientation))
 
         msg.base_for_control = HandTrajectoryRosMessage.WORLD
         msg.execution_mode = HandTrajectoryRosMessage.OVERRIDE
@@ -114,24 +107,29 @@ class HandControl:
 
         To get right hand fingers oriented properly, rotate 90 degrees about z
         (for left it would be -90)
-
-        q1 = u x sin(theta/2) + cos(theta/2)
-        u = [0, 0, 1], theta = 90
-        q1 = [0, 0, sin(45), cos(45)]
         
         Then, we rotate 90 degrees about y so palm faces wall
-
-        u = [0, 1, 0], theta = 90
-        q2 = [0, sin(45), 0, cos(45)]
         '''
+        y_axis_unit = (0, 1, 0)
+        z_axis_unit = (0, 0, 1)
+
         if hand_side == self.LEFT:
-            q1 = (-0.707, 0.707, 0, 0)
+            q1 = tf.transformations.quaternion_about_axis(-numpy.pi/2, z_axis_unit)
+
         else:
-            q1 = (0.707, 0.707, 0, 0)
-            
-        q2 = (0, 0.707, 0, 0.707)
-        quat = q_mult(q1, q2)
-        trajectory.orientation = quat
+            q1 = tf.transformations.quaternion_about_axis(numpy.pi/2, z_axis_unit)
+           
+        q2 = tf.transformations.quaternion_about_axis(numpy.pi/2, y_axis_unit)
+
+        q = tf.transformations.quaternion_multiply(q1, q2)
+
+        # this orientation IS a quaternion, in message definition
+        trajectory.orientation.x = q[0]
+        trajectory.orientation.y = q[1]
+        trajectory.orientation.z = q[2]
+        trajectory.orientation.w = q[3]
+
+        rospy.loginfo(trajectory.orientation)
 
         motion_time = in_msg.motion_time
         if motion_time == None or motion_time <= 0:
@@ -139,7 +137,7 @@ class HandControl:
         else:
             trajectory.time = float(motion_time)/2.0
         msg.taskspace_trajectory_points.append(trajectory)
-
+ 
         rospy.loginfo('publishing button push trajectory')
         self.trajectoryPublisher.publish(msg)
 
@@ -148,19 +146,16 @@ class HandControl:
         '''
         press_time = in_msg.press_time
         if press_time == None or press_time <= 0:
-            trajectory.time = 1
-        else:
-            trajectory.time = float(press_time)/2.0
+            press_time = 0.1
         time.sleep(press_time)
 
         '''
-        Return hand where it originally started (relative to the robot's chest)
+        Return hand where it originally started
         '''
         trajectory.position = start_trajectory.position
         trajectory.orientation = start_trajectory.orientation
-        trajectory.time = 1
         # in case the robot is moving while we issue the command, move with the chest
-        msg.base_for_control = HandTrajectoryRosMessage.CHEST
+        # msg.base_for_control = HandTrajectoryRosMessage.CHEST
         msg.previous_message_id = msg.unique_id
         msg.unique_id = rospy.Time.now().nsecs
         msg.execution_mode = HandTrajectoryRosMessage.QUEUE
@@ -169,9 +164,12 @@ class HandControl:
         rospy.loginfo('publishing return hand trajectory')
         self.trajectoryPublisher.publish(msg)
 
-
 if __name__ == '__main__':
     rospy.init_node("hand_control")
     hand_controller = HandControl()
+
+    tfBuffer = tf2_ros.Buffer()
+    tf2_ros.TransformListener(tfBuffer)
+
     rospy.loginfo("HandControl ready")     
     rospy.spin()

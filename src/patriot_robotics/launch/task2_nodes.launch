@@ -1,0 +1,8 @@
+<launch>
+
+  <node pkg="patriot_robotics" type="hand_control.py" 
+	name="hand_control" ns="patriot_robotics">
+    <remap from="trajectoryPublisher" to="/ihmc_ros/valkyrie/control/hand_trajectory" />
+
+  </node>
+ </launch>

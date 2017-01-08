@@ -5,9 +5,6 @@ uint8 side
 # pressing the button. If not provided, a reasonable default will be used.
 float64 motion_time
 
-# Time spent pressing the button. If not provided, a reasonable default will be used.
-float64 press_time
-
 # Location of the button in world coordinates
 geometry_msgs/Vector3 button_position
 

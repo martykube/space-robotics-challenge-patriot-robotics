@@ -9,10 +9,12 @@ import math
 import numpy
 
 from geometry_msgs.msg import Vector3
+from std_msgs.msg import Empty, UInt8
 
-from ihmc_msgs.msg import HandTrajectoryRosMessage
+from ihmc_msgs.msg import HandTrajectoryRosMessage, ArmTrajectoryRosMessage
+from ihmc_msgs.msg import OneDoFJointTrajectoryRosMessage
 from ihmc_msgs.msg import HandDesiredConfigurationRosMessage
-from ihmc_msgs.msg import SE3TrajectoryPointRosMessage
+from ihmc_msgs.msg import SE3TrajectoryPointRosMessage, TrajectoryPoint1DRosMessage
 
 from patriot_robotics.msg import ButtonPressMessage
 
@@ -29,25 +31,32 @@ class HandControl:
 
     Subscribes:
     - button_push Tell the specified hand to push the button, with hand in y-z world plane
+    - reset_hand Tell the specified hand to go back to resting position next to pelvis
 
-    Publishes:
-    - hand_return_sent The return trajectory has been determined and it is safe to move the 
-    robot forward again
+    Test examples:
+    rostopic pub --once /patriot_robotics/button_press patriot_robotics/ButtonPressMessage 1 5 "[0.7, -0.2, 0.9]"
+    (above is safe only when robot is at start)
+    rostopic pub --once /patriot_robotics/reset_hand std_msgs/UInt8 1
+
     '''
-
     def __init__(self):   
+        # hardcoded to valkyrie values
         self.RIGHT_HAND_FRAME_NAME = "rightPalm"
         self.LEFT_HAND_FRAME_NAME = "leftPalm"
+        self.PELVIS_FRAME_NAME = "pelvis"
 
         self.LEFT = HandTrajectoryRosMessage.LEFT
         self.RIGHT = HandTrajectoryRosMessage.RIGHT
-
+        
         # messages to be processed
         rospy.Subscriber("button_press", ButtonPressMessage, self.pushButton)
+        rospy.Subscriber("reset_hand", UInt8, self.returnHome)
    
         # trajectoryPublisherName = "/ihmc_ros/valkyrie/control/hand_trajectory"
         self.trajectoryPublisher = rospy.Publisher("trajectoryPublisher", 
-            HandTrajectoryRosMessage, queue_size=1)
+            HandTrajectoryRosMessage, queue_size=5)
+        self.armTrajectoryPublisher = rospy.Publisher("armTrajectoryPublisher", 
+            ArmTrajectoryRosMessage, queue_size=5)
    
     '''
     Push a button. The button is assumed to be in the y-z plane so the palm will be oriented
@@ -56,15 +65,9 @@ class HandControl:
     For parameters, see ButtonPressMessage.
 
     side = which hand to use
-    motion_time = defaults to 2s
-    press_time = defaults to 0.1s
+    motion_time = defaults to 1s
 
-    The function moves the hand to do the press, then moves it back to its original position. If
-    the rest of the robot has moved before the return motion occurs, the hand position will adjust 
-    relative to the robot's chest. It is therefore possible to start the robot moving again immediately
-    after this function completes. (Of course, the door might not be open then in that case, or
-    you might catch the arm on the frame.)
-    '''
+     '''
     def pushButton(self, in_msg):
         rospy.loginfo("Button press starting.")
 
@@ -85,20 +88,13 @@ class HandControl:
             hand_frame = self.RIGHT_HAND_FRAME_NAME
             rospy.loginfo("Using right hand to press button.")
  
-        # remember where we started
-        start_trajectory = SE3TrajectoryPointRosMessage()     
-        hand_world = tfBuffer.lookup_transform('world', hand_frame, rospy.Time())
-        start_trajectory.orientation = hand_world.transform.rotation
-        start_trajectory.position = hand_world.transform.translation
-        rospy.loginfo('starting hand position, in world: {0}'.format(start_trajectory.position))
-        rospy.loginfo('starting hand orientation, in world: {0}'.format(start_trajectory.orientation))
-
         msg.base_for_control = HandTrajectoryRosMessage.WORLD
         msg.execution_mode = HandTrajectoryRosMessage.OVERRIDE
         msg.unique_id = rospy.Time.now().nsecs
 
         trajectory = SE3TrajectoryPointRosMessage()
         trajectory.position = in_msg.button_position
+        # do not delete these next two or rotation fails
         trajectory.linear_velocity = Vector3(0, 0, 0)
         trajectory.angular_velocity = Vector3(0, 0, 0)
 
@@ -145,28 +141,72 @@ class HandControl:
         rospy.loginfo('publishing button push trajectory')
         self.trajectoryPublisher.publish(msg)
 
-        '''
-        Pause
-        '''
-        press_time = in_msg.press_time
-        if press_time == None or press_time <= 0:
-            press_time = 0.1
-        time.sleep(press_time)
+    # Used in returnHome function; copied from armDemo.py
+    def appendArmTrajectoryPoint(self, arm_trajectory, time, positions):
+        if not arm_trajectory.joint_trajectory_messages:
+            arm_trajectory.joint_trajectory_messages = \
+                [copy.deepcopy(OneDoFJointTrajectoryRosMessage()) for i in range(len(positions))]
+        for i, pos in enumerate(positions):
+            point = TrajectoryPoint1DRosMessage()
+            point.time = time
+            point.position = pos
+            point.velocity = 0
+            arm_trajectory.joint_trajectory_messages[i].trajectory_points.append(point)
+        return arm_trajectory
 
-        '''
-        Return hand where it originally started
-        '''
-        trajectory.position = start_trajectory.position
-        trajectory.orientation = start_trajectory.orientation
-        # in case the robot is moving while we issue the command, move with the chest
-        # msg.base_for_control = HandTrajectoryRosMessage.CHEST
-        msg.previous_message_id = msg.unique_id
+    def returnHome(self, in_msg):
+        msg = ArmTrajectoryRosMessage()
+
+        msg.robot_side = in_msg.data
+
+        # ELBOW_BENT_UP = [0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0]
+        # to understand this, generate a frame list; these joints are in that order
+        # the first is shoulder roll; last is wrist roll
+        rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
+        msg = self.appendArmTrajectoryPoint(msg, 1.0, rest_state)
+ 
+        msg.execution_mode = HandTrajectoryRosMessage.OVERRIDE
         msg.unique_id = rospy.Time.now().nsecs
-        msg.execution_mode = HandTrajectoryRosMessage.QUEUE
-        msg.taskspace_trajectory_points[0] = trajectory
-     
-        rospy.loginfo('publishing return hand trajectory')
-        self.trajectoryPublisher.publish(msg)
+
+        rospy.loginfo('publishing right trajectory')
+        self.armTrajectoryPublisher.publish(msg)
+        
+
+    def returnHomeOld(self, in_msg): 
+        msg = HandTrajectoryRosMessage()       
+
+        msg.base_for_control = HandTrajectoryRosMessage.WORLD
+        msg.execution_mode = HandTrajectoryRosMessage.OVERRIDE
+        msg.unique_id = rospy.Time.now().nsecs
+
+        trajectory = SE3TrajectoryPointRosMessage()
+        # do not delete these next two or rotation fails
+        trajectory.linear_velocity = Vector3(0, 0, 0)
+        trajectory.angular_velocity = Vector3(0, 0, 0)
+        trajectory.time = 0.5
+        trajectory.orientation.x = 0;
+        trajectory.orientation.y = 0;
+        trajectory.orientation.z = 0;
+        trajectory.orientation.w = 1;
+
+        pelvisWorld = tfBuffer.lookup_transform('world', self.PELVIS_FRAME_NAME, rospy.Time())
+        trajectory.position = pelvisWorld.transform.translation
+
+        hand_side = in_msg.data
+        offset = 1.0
+        if hand_side == self.LEFT:
+            msg.robot_side = HandTrajectoryRosMessage.LEFT
+            trajectory.position.x += offset
+            rospy.loginfo("Left hand going home.")
+        else:
+            msg.robot_side = HandTrajectoryRosMessage.RIGHT
+            trajectory.position.x -= offset
+            rospy.loginfo("Right hand going home.")
+        
+        msg.taskspace_trajectory_points.append(trajectory)
+
+        rospy.loginfo('publishing hand return home trajectory')
+        self.trajectoryPublisher.publish(msg)        
 
 if __name__ == '__main__':
     rospy.init_node("hand_control")

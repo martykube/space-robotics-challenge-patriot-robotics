@@ -135,7 +135,7 @@ class HandControl:
         if motion_time == None or motion_time <= 0:
             trajectory.time = 1
         else:
-            trajectory.time = float(motion_time)/2.0
+            trajectory.time = float(motion_time)
         msg.taskspace_trajectory_points.append(trajectory)
  
         rospy.loginfo('publishing button push trajectory')

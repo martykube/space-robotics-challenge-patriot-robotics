@@ -154,6 +154,10 @@ class HandControl:
             arm_trajectory.joint_trajectory_messages[i].trajectory_points.append(point)
         return arm_trajectory
 
+    '''
+    Brings arm back to robot side with the elbow bent. This is more or less how the robot looks
+    when first dropped in the world, and is a safe way to move through narrow doors.
+    '''
     def returnHome(self, in_msg):
         msg = ArmTrajectoryRosMessage()
 
@@ -162,6 +166,7 @@ class HandControl:
         # ELBOW_BENT_UP = [0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0]
         # to understand this, generate a frame list; these joints are in that order
         # the first is shoulder roll; last is wrist roll
+        # if invalid values are used, the message silently fails.
         rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
         msg = self.appendArmTrajectoryPoint(msg, 1.0, rest_state)
  
@@ -171,43 +176,6 @@ class HandControl:
         rospy.loginfo('publishing right trajectory')
         self.armTrajectoryPublisher.publish(msg)
         
-
-    def returnHomeOld(self, in_msg): 
-        msg = HandTrajectoryRosMessage()       
-
-        msg.base_for_control = HandTrajectoryRosMessage.WORLD
-        msg.execution_mode = HandTrajectoryRosMessage.OVERRIDE
-        msg.unique_id = rospy.Time.now().nsecs
-
-        trajectory = SE3TrajectoryPointRosMessage()
-        # do not delete these next two or rotation fails
-        trajectory.linear_velocity = Vector3(0, 0, 0)
-        trajectory.angular_velocity = Vector3(0, 0, 0)
-        trajectory.time = 0.5
-        trajectory.orientation.x = 0;
-        trajectory.orientation.y = 0;
-        trajectory.orientation.z = 0;
-        trajectory.orientation.w = 1;
-
-        pelvisWorld = tfBuffer.lookup_transform('world', self.PELVIS_FRAME_NAME, rospy.Time())
-        trajectory.position = pelvisWorld.transform.translation
-
-        hand_side = in_msg.data
-        offset = 1.0
-        if hand_side == self.LEFT:
-            msg.robot_side = HandTrajectoryRosMessage.LEFT
-            trajectory.position.x += offset
-            rospy.loginfo("Left hand going home.")
-        else:
-            msg.robot_side = HandTrajectoryRosMessage.RIGHT
-            trajectory.position.x -= offset
-            rospy.loginfo("Right hand going home.")
-        
-        msg.taskspace_trajectory_points.append(trajectory)
-
-        rospy.loginfo('publishing hand return home trajectory')
-        self.trajectoryPublisher.publish(msg)        
-
 if __name__ == '__main__':
     rospy.init_node("hand_control")
     hand_controller = HandControl()

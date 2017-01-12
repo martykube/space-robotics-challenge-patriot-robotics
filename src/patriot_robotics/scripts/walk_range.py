@@ -32,39 +32,41 @@ STEP_OFFSET_MAJOR = 0.4
 LEFT_FOOT_FRAME_NAME = None
 RIGHT_FOOT_FRAME_NAME = None
 
-
 #=========================================================================================================
 # Supporting Methods
 #=========================================================================================================
-def walkToLocation(min_distance):
+def walkToLocation(num_steps, separate_feet):
     global stepDistance
     msg = FootstepDataListRosMessage()
+    
     # ----- Default Value: 1.5
-    msg.transfer_time = 0.6
-    msg.swing_time = 0.6
+    msg.transfer_time = 0.7
+    msg.swing_time = 0.7
     msg.execution_mode = 0
     msg.unique_id = -1
 
     stepCounter = 0
+    footSeparation = 0.0
 
-    #-------------------------------------------------------------------------
-    # Separate the feet slightly so that we can go faster with less chance of
-    # foot collisions.
-    #-------------------------------------------------------------------------
-    rospy.loginfo('Separating feet...') 
-    footSeparation = 0.07  
- 
-    msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
-    footStepListPublisher.publish(msg)
-    waitForFootstepCompletion()
-    stepCounter += 1
-    msg.footstep_data_list[:] = []
-    
-    msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
-    footStepListPublisher.publish(msg)
-    waitForFootstepCompletion()
-    stepCounter += 1
-    msg.footstep_data_list[:] = []
+    if separate_feet:    
+        #-------------------------------------------------------------------------
+        # Separate the feet slightly so that we can go faster with less chance of
+        # foot collisions.
+        #-------------------------------------------------------------------------
+        rospy.loginfo('Separating feet...') 
+        footSeparation = 0.07  
+        
+        msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
+        footStepListPublisher.publish(msg)
+        waitForFootstepCompletion()
+        stepCounter += 1
+        msg.footstep_data_list[:] = []
+        
+        msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
+        footStepListPublisher.publish(msg)
+        waitForFootstepCompletion()
+        stepCounter += 1
+        msg.footstep_data_list[:] = []
 
     #-------------------------------------------------------------------------
     # Takes the initial step using the left foot first.
@@ -77,14 +79,13 @@ def walkToLocation(min_distance):
     msg.footstep_data_list[:] = []
 
     #---------------------------------------------------------------------------------
-    # Continue taking steps, alternating feet, until less then the min_distance
-    # in meters from door.
+    # Decided to hard code the number of steps since the qualifying round is static.
+    # 16 steps takes the robot to approximatelt 0.5m from the door.
+    # The 16 steps include the 2 side-steps at the beginning of the task.
     #
-    # Qual #1 min_distance =  0.75
-    # Qual #2 min_distance = 2.0
+    # 12 more steps takes us through the door an dpast the red line.
     #---------------------------------------------------------------------------------
-    rospy.loginfo('Minimum Distance From Wall: {0}'.format(min_distance))
-    while RANGE_TO_WALL > float(min_distance):
+    while stepCounter < num_steps:
         if stepCounter % 2 == 0:
             msg.footstep_data_list.append(createFootStepOffset(LEFT, [STEP_OFFSET_MAJOR, 0.0, 0.0]))
             rospy.loginfo('Stepping Left')
@@ -113,6 +114,25 @@ def walkToLocation(min_distance):
     stepCounter += 1
     msg.footstep_data_list[:] = []
     rospy.loginfo('Walking Stopped - LiDAR Range: {0}'.format(RANGE_TO_WALL))
+
+    #-------------------------------------------------------------------------
+    # Bring feet back together to get through the door without hitting sides.
+    #-------------------------------------------------------------------------
+    if footSeparation == 0.07:
+        rospy.loginfo('Bring feet back together...') 
+        footSeparation = -0.05  
+        
+        msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
+        footStepListPublisher.publish(msg)
+        waitForFootstepCompletion()
+        stepCounter += 1
+        msg.footstep_data_list[:] = []
+        
+        msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
+        footStepListPublisher.publish(msg)
+        waitForFootstepCompletion()
+        stepCounter += 1
+        msg.footstep_data_list[:] = []
 
 
 def createFootStepInPlace(stepSide):
@@ -158,78 +178,6 @@ def waitForFootstepCompletion():
     stepComplete = False
     while not stepComplete:
         rate.sleep()
-
-#---------------------------------------------------------------------------
-# The following code supports finding a statistically valid minimum
-# range to obsticle by calculating outliers based on the complete data set.
-#---------------------------------------------------------------------------
-def calc_min_outlier(dataPoints):
-    Q1 = quartiles(dataPoints)[0]
-    Q3 = quartiles(dataPoints)[1]  
-    IQR = (Q3 - Q1) * 1.5
-    min_outlier = Q1 - IQR
-    max_outlier = Q3 + IQR
-    
-    return min_outlier, max_outlier
-
-
-def median(dataPoints):
-    """
-    the median of given data
-    Arguments:
-        dataPoints: a list of data points, int or float
-    Returns:
-        the middle number in the sorted list, a float or an int
-    """
-    if not dataPoints:
-        raise StatsError('no data points passed')
-        
-    sortedPoints = sorted(dataPoints)
-    mid = len(sortedPoints) // 2  # uses the floor division to have integer returned
-    if (len(sortedPoints) % 2 == 0):
-        # even
-        return (sortedPoints[mid-1] + sortedPoints[mid]) / 2.0
-    else:
-        # odd
-        return sortedPoints[mid]
-
-
-def quartiles(dataPoints):
-    """
-    the lower and upper quartile
-    Arguments:
-        dataPoints: a list of data points, int or float
-    Returns:
-        the first and the last quarter in the sorted list, a tuple of float or int
-    """
-    if not dataPoints:
-        raise StatsError('no data points passed')
-        
-    sortedPoints = sorted(dataPoints)
-    mid = len(sortedPoints) // 2 # uses the floor division to have integer returned
-    
-    if (len(sortedPoints) % 2 == 0):
-        # even
-        lowerQ = median(sortedPoints[:mid])
-        upperQ = median(sortedPoints[mid:])
-    else:
-        # odd
-        lowerQ = median(sortedPoints[:mid])
-        upperQ = median(sortedPoints[mid+1:])
-            
-    return (lowerQ, upperQ)
-
-
-def calc_min_range(dataPoints):
-    min_outlier = calc_min_outlier(dataPoints)[0]
-    sortedPoints = sorted(dataPoints)
-    ndx = 0
-    min_range = sortedPoints[ndx]
-    while min_range <= min_outlier:
-        ndx += 1
-        min_range = sortedPoints[ndx]
-        
-    return min_range
 
 
 #=========================================================================================================
@@ -301,6 +249,27 @@ if __name__ == '__main__':
             # Initiate walking forwards.
             #-------------------------------------------------------------------------
             if not rospy.is_shutdown():
-                walkToLocation(min_dist)
+                #---------------------------------------------------------------------
+                # Walk up to door.
+                #---------------------------------------------------------------------
+                rospy.loginfo('Begin walking towards door...')
+                walkToLocation(16, True)
+                rospy.loginfo('Arrived at door.')
+                
+                #---------------------------------------------------------------------
+                # Push Button Here.
+                #---------------------------------------------------------------------
+                rospy.loginfo('Begin push door button...')
+                time.sleep(30)
+                rospy.loginfo('Door is open.')
+
+                #---------------------------------------------------------------------
+                # Walk through the door.
+                #---------------------------------------------------------------------
+                rospy.loginfo('Begin walking through door...')
+                walkToLocation(12, False)
+                rospy.loginfo('Qual Task #2 Complete.')
+
+                
     except rospy.ROSInterruptException:
         pass

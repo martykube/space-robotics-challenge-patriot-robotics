@@ -49,7 +49,8 @@ class HandControl:
         self.RIGHT = HandTrajectoryRosMessage.RIGHT
         
         # messages to be processed
-        rospy.Subscriber("button_press", ButtonPressMessage, self.pushButton)
+        # rospy.Subscriber("button_press", ButtonPressMessage, self.pushButton)
+        rospy.Subscriber("button_press", Empty, self.pushButtonHardCode)
         rospy.Subscriber("reset_hand", UInt8, self.returnHome)
    
         # trajectoryPublisherName = "/ihmc_ros/valkyrie/control/hand_trajectory"
@@ -163,19 +164,46 @@ class HandControl:
 
         msg.robot_side = in_msg.data
 
-        # ELBOW_BENT_UP = [0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0]
-        # to understand this, generate a frame list; these joints are in that order
-        # the first is shoulder roll; last is wrist roll
-        # if invalid values are used, the message silently fails.
         rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
         msg = self.appendArmTrajectoryPoint(msg, 1.0, rest_state)
  
-        msg.execution_mode = HandTrajectoryRosMessage.OVERRIDE
+        msg.execution_mode = ArmTrajectoryRosMessage.OVERRIDE
         msg.unique_id = rospy.Time.now().nsecs
 
         rospy.loginfo('publishing right trajectory')
         self.armTrajectoryPublisher.publish(msg)
-        
+
+    def pushButtonHardCode(self, in_msg):
+        msg = ArmTrajectoryRosMessage()
+
+        msg.robot_side = ArmTrajectoryRosMessage.RIGHT
+
+         # ELBOW_BENT_UP = [0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0]
+-        # to understand this, generate a frame list; these joints are in that order
+-        # the first is shoulder roll; last is wrist roll
+-        # if invalid values are used, the message silently fails.
+
+        setup_vector1 = [+numpy.pi/6, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
+        setup_vector2 = [+numpy.pi/6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        # button_push = [-1.151, .930, 1.110, 0.624, 0.0, 0.0, 0.0]
+        button_push = [-1.151, .75, 0.7, 0.624, 0.0, 0.0, 0.0]
+        rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
+
+        # The numbers represent time by which this motion should be completed
+        # speeding up the part before button_push vector has an advantage, the others
+        # not (because we are waiting for the door to open anyway
+        msg = self.appendArmTrajectoryPoint(msg, 1.0, setup_vector1)
+        msg = self.appendArmTrajectoryPoint(msg, 2.0, setup_vector2)
+        msg = self.appendArmTrajectoryPoint(msg, 3.0, button_push)
+        msg = self.appendArmTrajectoryPoint(msg, 4.0, setup_vector2)
+        msg = self.appendArmTrajectoryPoint(msg, 5.0, rest_state)
+ 
+        msg.execution_mode = ArmTrajectoryRosMessage.OVERRIDE
+        msg.unique_id = rospy.Time.now().nsecs
+
+        rospy.loginfo('publishing right trajectory')
+        self.armTrajectoryPublisher.publish(msg)
+
 if __name__ == '__main__':
     rospy.init_node("hand_control")
     hand_controller = HandControl()

@@ -43,6 +43,53 @@ RIGHT_FOOT_FRAME_NAME = None
 #=========================================================================================================
 # Supporting Methods
 #=========================================================================================================
+def crossDoorThreshold():
+    msg = FootstepDataListRosMessage()
+
+    # ----- Default Value: 1.5
+    msg.transfer_time = 1.5
+    msg.swing_time = 1.5
+    msg.execution_mode = FootstepDataListRosMessage.OVERRIDE
+    msg.unique_id = rospy.Time.now().nsecs
+
+    DOOR_OFFSET = 0.6
+    # to make up for fact feet may have come together, move them out a bit
+    sideOffset = 0.05
+    threshold_height = 0.05
+
+    # we list left already, so don't move that way; only go right
+    msg.footstep_data_list.append(createFootStepOffset(RIGHT, [DOOR_OFFSET/2.0, -sideOffset, threshold_height]))
+    rospy.loginfo("Stepping half-step right, and up.")
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion(3)
+    rospy.loginfo("Step finished.")
+    msg.footstep_data_list[:] = []
+        
+    msg.footstep_data_list.append(createFootStepOffset(LEFT, [DOOR_OFFSET, 0.0, 0.0]))
+    rospy.loginfo("Stepping left.")
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion(3)
+    rospy.loginfo("Step finished.")
+    msg.footstep_data_list[:] = []
+
+    rospy.loginfo("Stepping right and down.")
+    msg.footstep_data_list.append(createFootStepOffset(RIGHT, [DOOR_OFFSET/2.0, 0.0, 
+-threshold_height]))
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion(3)
+    rospy.loginfo("Step finished.")
+    msg.footstep_data_list[:] = []
+
+    msg.footstep_data_list.append(createFootStepOffset(LEFT, [DOOR_OFFSET/2.0, 0.0, 0.0]))
+    rospy.loginfo("Stepping half-step left.")
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion(3)
+    time.sleep(15)
+    rospy.loginfo("Step finished.")
+    msg.footstep_data_list[:] = []
+
+    return
+
 def walkToLocation(num_steps, separate_feet):
     global stepDistance
     msg = FootstepDataListRosMessage()
@@ -50,30 +97,31 @@ def walkToLocation(num_steps, separate_feet):
     # ----- Default Value: 1.5
     msg.transfer_time = 0.7
     msg.swing_time = 0.7
-    msg.execution_mode = 0
-    msg.unique_id = -1
+    msg.execution_mode = FootstepDataListRosMessage.OVERRIDE
+    msg.unique_id = rospy.Time.now().nsecs
 
     stepCounter = 0
-    footSeparation = 0.0
+    footSeparation = 0.03
 
     if separate_feet:    
         #-------------------------------------------------------------------------
         # Separate the feet slightly so that we can go faster with less chance of
         # foot collisions.
+        #
+        # Don't count these as forward steps.
         #-------------------------------------------------------------------------
         rospy.loginfo('Separating feet...') 
-        footSeparation = 0.07  
         
-        msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
+        msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))        
         footStepListPublisher.publish(msg)
         waitForFootstepCompletion()
-        stepCounter += 1
+        # stepCounter += 1
         msg.footstep_data_list[:] = []
         
         msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
         footStepListPublisher.publish(msg)
         waitForFootstepCompletion()
-        stepCounter += 1
+        # stepCounter += 1
         msg.footstep_data_list[:] = []
 
     #-------------------------------------------------------------------------
@@ -88,8 +136,7 @@ def walkToLocation(num_steps, separate_feet):
 
     #---------------------------------------------------------------------------------
     # Decided to hard code the number of steps since the qualifying round is static.
-    # 16 steps takes the robot to approximatelt 0.5m from the door.
-    # The 16 steps include the 2 side-steps at the beginning of the task.
+    # 14 forward steps takes the robot to approximatelt 0.5m from the door.
     #
     # 12 more steps takes us through the door an dpast the red line.
     #---------------------------------------------------------------------------------
@@ -101,7 +148,8 @@ def walkToLocation(num_steps, separate_feet):
             msg.footstep_data_list.append(createFootStepOffset(RIGHT, [STEP_OFFSET_MAJOR, 0.0, 0.0]))
             rospy.loginfo('Stepping Right')
 
-        rospy.loginfo('Walking - LiDAR Range: {0} Step Count: {1}'.format(RANGE_TO_WALL, stepCounter))
+        # rospy.loginfo('Walking - LiDAR Range: {0} Step Count: {1}'.format(RANGE_TO_WALL, stepCounter))
+        rospy.loginfo('Step {0} finished.'.format(stepCounter))
         footStepListPublisher.publish(msg)
         waitForFootstepCompletion()
         stepCounter += 1
@@ -121,8 +169,9 @@ def walkToLocation(num_steps, separate_feet):
     waitForFootstepCompletion()
     stepCounter += 1
     msg.footstep_data_list[:] = []
-    rospy.loginfo('Walking Stopped - LiDAR Range: {0}'.format(RANGE_TO_WALL))
-
+    # rospy.loginfo('Walking Stopped - LiDAR Range: {0}'.format(RANGE_TO_WALL))
+    rospy.loginfo('Step {0} finished.'.format(stepCounter))
+ 
     #-------------------------------------------------------------------------
     # Bring feet back together to get through the door without hitting sides.
     #-------------------------------------------------------------------------
@@ -180,12 +229,29 @@ def createFootStepOffset(stepSide, offset):
 
     return footstep
 
+'''
 
-def waitForFootstepCompletion():
+Added optional timeout value (s) so we don't get stuck here.
+
+'''
+def waitForFootstepCompletion(timeout = 0):
     global stepComplete
     stepComplete = False
-    while not stepComplete:
-        rate.sleep()
+    
+    if(timeout <= 0):
+        while not stepComplete:
+            rate.sleep()
+    else:
+        rospy.loginfo("footstep timeout is {0}".format(timeout))
+        startTime = rospy.Time().nsecs
+        currentTime = rospy.Time().nsecs
+        while ((not stepComplete) and ((currentTime - startTime) * (10 ^ 9) < timeout)):
+            rate.sleep()
+            currentTime = rospy.Time().nsecs
+
+    if not stepComplete:
+        rospy.loginfo("Timeout hit for footstep completion.")
+        
 
 #=========================================================================================================
 # Callbacks
@@ -232,7 +298,7 @@ if __name__ == '__main__':
                 # Subscribers
                 #-------------------------------------------------------------------------
                 footStepStatusSubscriber = rospy.Subscriber("/ihmc_ros/{0}/output/footstep_status".format(ROBOT_NAME), FootstepStatusRosMessage, footStepStatus_callback)
-                lidarScanRangeSubcriber = rospy.Subscriber('/multisense/lidar_scan'.format(ROBOT_NAME), LaserScan, scan_callback)
+                # lidarScanRangeSubcriber = rospy.Subscriber('/multisense/lidar_scan'.format(ROBOT_NAME), LaserScan, scan_callback)
                 rospy.loginfo('Subscribers Initiated.')
 
                 #-------------------------------------------------------------------------
@@ -241,9 +307,11 @@ if __name__ == '__main__':
                 footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=1)
                 buttonPressPublisher = rospy.Publisher("/patriot_robotics/button_press", Empty, queue_size=5)
                 rospy.loginfo('Publishers Initiated.')
+            else:
+                rospy.logerr('Required parameters for subscribers missing!')
 
-                tfBuffer = tf2_ros.Buffer()
-                tfListener = tf2_ros.TransformListener(tfBuffer)
+            tfBuffer = tf2_ros.Buffer()
+            tfListener = tf2_ros.TransformListener(tfBuffer)
 
             rate = rospy.Rate(10) # 10hz
             time.sleep(1)
@@ -269,7 +337,7 @@ if __name__ == '__main__':
                 # Walk up to door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking towards door...')
-                walkToLocation(16, True)
+                walkToLocation(14, True)
                 rospy.loginfo('Arrived at door.')
 
                 # without this, it appears subsequent messages don't get through
@@ -287,6 +355,12 @@ if __name__ == '__main__':
                 #---------------------------------------------------------------------
                 # Walk through the door.
                 #---------------------------------------------------------------------
+                rospy.loginfo('Walking up to door...')                
+                walkToLocation(2, False)
+
+                rospy.loginfo('Crossing door threshold...')
+                crossDoorThreshold()
+
                 rospy.loginfo('Begin walking through door...')
                 walkToLocation(13, False)
                 rospy.loginfo('Qual Task #2 Complete.')

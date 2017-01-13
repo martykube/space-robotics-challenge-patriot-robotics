@@ -40,6 +40,7 @@ RIGHT_FOOT_FRAME_NAME = None
 
 ZERO_VECTOR = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 ELBOW_BENT_UP = [-1.151, .930, 1.110, 0.624, 0.0, 0.0, 0.0]
+RESET_STATE = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
 
 #=========================================================================================================
 # Supporting Methods
@@ -203,6 +204,17 @@ def sendRightArmTrajectory():
     rospy.loginfo('publishing right trajectory')
     armTrajectoryPublisher.publish(msgA)
 
+def resetArm():
+	msgA = ArmTrajectoryRosMessage()
+
+	msgA.robot_side = ArmTrajectoryRosMessage.RIGHT
+
+	msgA = appendTrajectoryPoint(msgA, 6.0, RESET_STATE)
+
+	msgA.unique_id = -1
+
+	rospy.loginfo('publishing reset arm')
+	armTrajectoryPublisher.publish(msgA)
 
 def appendTrajectoryPoint(arm_trajectory, time, positions):
     if not arm_trajectory.joint_trajectory_messages:
@@ -300,20 +312,30 @@ if __name__ == '__main__':
                 rospy.loginfo('Begin walking towards door...')
                 walkToLocation(17, True)
                 rospy.loginfo('Arrived at door.')
+
+		time.sleep(2)
                 
                 #---------------------------------------------------------------------
                 # Push Button Here.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin push door button...')
                 sendRightArmTrajectory()
-                time.sleep(2)
+                time.sleep(15)
                 rospy.loginfo('Door is open.')
+
+		#---------------------------------------------------------------------
+		# Reset Arm
+		#---------------------------------------------------------------------
+		rospy.loginfo('Begin Reset Arm...')
+		resetArm()
+		time.sleep(15)
+		rospy.loginfo('Arm Reset.')		
 
                 #---------------------------------------------------------------------
                 # Walk through the door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking through door...')
-                #walkToLocation(12, False)
+                walkToLocation(12, False)
                 rospy.loginfo('Qual Task #2 Complete.')
 
                 

@@ -101,7 +101,7 @@ def walkToLocation(num_steps, separate_feet):
     msg.unique_id = rospy.Time.now().nsecs
 
     stepCounter = 0
-    footSeparation = 0.03
+    footSeparation = 0.07
 
     if separate_feet:    
         #-------------------------------------------------------------------------

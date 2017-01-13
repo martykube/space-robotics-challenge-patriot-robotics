@@ -40,10 +40,6 @@ STEP_OFFSET_MAJOR = 0.4
 LEFT_FOOT_FRAME_NAME = None
 RIGHT_FOOT_FRAME_NAME = None
 
-ZERO_VECTOR = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-ELBOW_BENT_UP = [-1.151, .930, 1.110, 0.624, 0.0, 0.0, 0.0]
-RESET_STATE = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
-
 #=========================================================================================================
 # Supporting Methods
 #=========================================================================================================
@@ -191,43 +187,6 @@ def waitForFootstepCompletion():
     while not stepComplete:
         rate.sleep()
 
-def sendRightArmTrajectory():
-    msgA = ArmTrajectoryRosMessage()
-    
-    msgA.robot_side = ArmTrajectoryRosMessage.RIGHT
-    msgA.execution_mode = ArmTrajectoryRosMessage.OVERRIDE
-    
-    # msgA = appendTrajectoryPoint(msgA, 3.0, ZERO_VECTOR)
-    msgA = appendTrajectoryPoint(msgA, 1.0, ELBOW_BENT_UP)
-    msgA = appendTrajectoryPoint(msgA, 2.0, RESET_STATE)
-
-    msgA.unique_id = rospy.Time.now().nsecs
-
-    rospy.loginfo('publishing right trajectory')
-    armTrajectoryPublisher.publish(msgA)
-
-def resetArm():
-	msgA = ArmTrajectoryRosMessage()
-
-	msgA.robot_side = ArmTrajectoryRosMessage.RIGHT
-	msgA = appendTrajectoryPoint(msgA, 1.0, RESET_STATE)
-
-	msgA.unique_id = rospy.Time.now().nsecs
-
-	rospy.loginfo('publishing reset arm')
-	armTrajectoryPublisher.publish(msgA)
-
-def appendTrajectoryPoint(arm_trajectory, time, positions):
-    if not arm_trajectory.joint_trajectory_messages:
-        arm_trajectory.joint_trajectory_messages = [copy.deepcopy(OneDoFJointTrajectoryRosMessage()) for i in range(len(positions))]
-    for i, pos in enumerate(positions):
-        point = TrajectoryPoint1DRosMessage()
-        point.time = time
-        point.position = pos
-        point.velocity = 0
-        arm_trajectory.joint_trajectory_messages[i].trajectory_points.append(point)
-    return arm_trajectory
-
 #=========================================================================================================
 # Callbacks
 #=========================================================================================================
@@ -239,7 +198,6 @@ def footStepStatus_callback(msg):
     global stepComplete
     if msg.status == 1:
         stepComplete = True
-        
         
 #=========================================================================================================
 # Main
@@ -281,7 +239,6 @@ if __name__ == '__main__':
                 # Publishers
                 #-------------------------------------------------------------------------
                 footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=1)
-                armTrajectoryPublisher = rospy.Publisher("/ihmc_ros/{0}/control/arm_trajectory".format(ROBOT_NAME), ArmTrajectoryRosMessage, queue_size=1)
                 buttonPressPublisher = rospy.Publisher("/patriot_robotics/button_press", Empty, queue_size=5)
                 rospy.loginfo('Publishers Initiated.')
 
@@ -299,9 +256,9 @@ if __name__ == '__main__':
                 while footStepListPublisher.get_num_connections() == 0:
                     rate.sleep()
 
-            if armTrajectoryPublisher.get_num_connections() == 0:
-                rospy.loginfo('waiting for subscriber...')
-                while armTrajectoryPublisher.get_num_connections() == 0:
+            if buttonPressPublisher.get_num_connections() == 0:
+                rospy.loginfo('waiting for button_press subscriber...did you start hand_control node?')
+                while buttonPressPublisher.get_num_connections() == 0:
                     rate.sleep()
 
             #-------------------------------------------------------------------------

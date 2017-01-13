@@ -26,6 +26,8 @@ from ihmc_msgs.msg import ArmTrajectoryRosMessage
 from ihmc_msgs.msg import OneDoFJointTrajectoryRosMessage
 from ihmc_msgs.msg import TrajectoryPoint1DRosMessage
 
+from std_msgs.msg import Empty
+
 #=========================================================================================================
 # Constants
 #=========================================================================================================
@@ -189,17 +191,17 @@ def waitForFootstepCompletion():
     while not stepComplete:
         rate.sleep()
 
-
 def sendRightArmTrajectory():
     msgA = ArmTrajectoryRosMessage()
     
     msgA.robot_side = ArmTrajectoryRosMessage.RIGHT
+    msgA.execution_mode = ArmTrajectoryRosMessage.OVERRIDE
     
-    msgA = appendTrajectoryPoint(msgA, 3.0, ZERO_VECTOR)
-    msgA = appendTrajectoryPoint(msgA, 4.0, ELBOW_BENT_UP)
-    msgA = appendTrajectoryPoint(msgA, 5.0, ZERO_VECTOR)
+    # msgA = appendTrajectoryPoint(msgA, 3.0, ZERO_VECTOR)
+    msgA = appendTrajectoryPoint(msgA, 1.0, ELBOW_BENT_UP)
+    msgA = appendTrajectoryPoint(msgA, 2.0, RESET_STATE)
 
-    msgA.unique_id = -1
+    msgA.unique_id = rospy.Time.now().nsecs
 
     rospy.loginfo('publishing right trajectory')
     armTrajectoryPublisher.publish(msgA)
@@ -208,10 +210,9 @@ def resetArm():
 	msgA = ArmTrajectoryRosMessage()
 
 	msgA.robot_side = ArmTrajectoryRosMessage.RIGHT
+	msgA = appendTrajectoryPoint(msgA, 1.0, RESET_STATE)
 
-	msgA = appendTrajectoryPoint(msgA, 6.0, RESET_STATE)
-
-	msgA.unique_id = -1
+	msgA.unique_id = rospy.Time.now().nsecs
 
 	rospy.loginfo('publishing reset arm')
 	armTrajectoryPublisher.publish(msgA)
@@ -281,6 +282,7 @@ if __name__ == '__main__':
                 #-------------------------------------------------------------------------
                 footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=1)
                 armTrajectoryPublisher = rospy.Publisher("/ihmc_ros/{0}/control/arm_trajectory".format(ROBOT_NAME), ArmTrajectoryRosMessage, queue_size=1)
+                buttonPressPublisher = rospy.Publisher("/patriot_robotics/button_press", Empty, queue_size=5)
                 rospy.loginfo('Publishers Initiated.')
 
                 tfBuffer = tf2_ros.Buffer()
@@ -310,34 +312,27 @@ if __name__ == '__main__':
                 # Walk up to door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking towards door...')
-                walkToLocation(17, True)
+                walkToLocation(16, True)
                 rospy.loginfo('Arrived at door.')
 
-		time.sleep(2)
-                
+                # without this, it appears subsequent messages don't get through
+                time.sleep(15)
+                         
                 #---------------------------------------------------------------------
                 # Push Button Here.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin push door button...')
-                sendRightArmTrajectory()
+                # sendRightArmTrajectory() # includes reset
+                buttonPressPublisher.publish(Empty())
                 time.sleep(15)
                 rospy.loginfo('Door is open.')
-
-		#---------------------------------------------------------------------
-		# Reset Arm
-		#---------------------------------------------------------------------
-		rospy.loginfo('Begin Reset Arm...')
-		resetArm()
-		time.sleep(15)
-		rospy.loginfo('Arm Reset.')		
-
+                
                 #---------------------------------------------------------------------
                 # Walk through the door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking through door...')
-                walkToLocation(12, False)
+                walkToLocation(13, False)
                 rospy.loginfo('Qual Task #2 Complete.')
-
-                
+               
     except rospy.ROSInterruptException:
         pass

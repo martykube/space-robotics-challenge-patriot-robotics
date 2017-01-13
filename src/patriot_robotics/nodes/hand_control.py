@@ -178,10 +178,10 @@ class HandControl:
 
         msg.robot_side = ArmTrajectoryRosMessage.RIGHT
 
-         # ELBOW_BENT_UP = [0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0]
--        # to understand this, generate a frame list; these joints are in that order
--        # the first is shoulder roll; last is wrist roll
--        # if invalid values are used, the message silently fails.
+        # ELBOW_BENT_UP = [0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0]
+        # to understand this, generate a frame list; these joints are in that order
+        # the first is shoulder roll; last is wrist roll
+        # if invalid values are used, the message silently fails.
 
         setup_vector1 = [+numpy.pi/6, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
         setup_vector2 = [+numpy.pi/6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

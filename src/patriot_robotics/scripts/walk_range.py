@@ -5,10 +5,13 @@
 #=========================================================================================================
 import tf
 import time
+import copy
 import numpy
 import rospy
 import tf2_ros
 import argparse
+
+from numpy import append
 
 from sensor_msgs.msg import LaserScan
 
@@ -19,6 +22,9 @@ from ihmc_msgs.msg import FootstepStatusRosMessage
 from ihmc_msgs.msg import FootstepDataListRosMessage
 from ihmc_msgs.msg import FootstepDataRosMessage
 
+from ihmc_msgs.msg import ArmTrajectoryRosMessage
+from ihmc_msgs.msg import OneDoFJointTrajectoryRosMessage
+from ihmc_msgs.msg import TrajectoryPoint1DRosMessage
 
 #=========================================================================================================
 # Constants
@@ -31,6 +37,9 @@ STEP_OFFSET_MINOR = 0.2
 STEP_OFFSET_MAJOR = 0.4
 LEFT_FOOT_FRAME_NAME = None
 RIGHT_FOOT_FRAME_NAME = None
+
+ZERO_VECTOR = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+ELBOW_BENT_UP = [-1.151, .930, 1.110, 0.624, 0.0, 0.0, 0.0]
 
 #=========================================================================================================
 # Supporting Methods
@@ -118,21 +127,21 @@ def walkToLocation(num_steps, separate_feet):
     #-------------------------------------------------------------------------
     # Bring feet back together to get through the door without hitting sides.
     #-------------------------------------------------------------------------
-    if footSeparation == 0.07:
-        rospy.loginfo('Bring feet back together...') 
-        footSeparation = -0.05  
-        
-        msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
-        footStepListPublisher.publish(msg)
-        waitForFootstepCompletion()
-        stepCounter += 1
-        msg.footstep_data_list[:] = []
-        
-        msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
-        footStepListPublisher.publish(msg)
-        waitForFootstepCompletion()
-        stepCounter += 1
-        msg.footstep_data_list[:] = []
+    # if footSeparation == 0.07:
+    #     rospy.loginfo('Bring feet back together...') 
+    #     footSeparation = -0.05  
+    #     
+    #     msg.footstep_data_list.append(createFootStepOffset(LEFT, [0.0, footSeparation, 0.0]))
+    #     footStepListPublisher.publish(msg)
+    #     waitForFootstepCompletion()
+    #     stepCounter += 1
+    #     msg.footstep_data_list[:] = []
+    #     
+    #     msg.footstep_data_list.append(createFootStepOffset(RIGHT, [0.0, -footSeparation, 0.0]))
+    #     footStepListPublisher.publish(msg)
+    #     waitForFootstepCompletion()
+    #     stepCounter += 1
+    #     msg.footstep_data_list[:] = []
 
 
 def createFootStepInPlace(stepSide):
@@ -180,6 +189,32 @@ def waitForFootstepCompletion():
         rate.sleep()
 
 
+def sendRightArmTrajectory():
+    msgA = ArmTrajectoryRosMessage()
+    
+    msgA.robot_side = ArmTrajectoryRosMessage.RIGHT
+    
+    msgA = appendTrajectoryPoint(msgA, 3.0, ZERO_VECTOR)
+    msgA = appendTrajectoryPoint(msgA, 4.0, ELBOW_BENT_UP)
+    msgA = appendTrajectoryPoint(msgA, 5.0, ZERO_VECTOR)
+
+    msgA.unique_id = -1
+
+    rospy.loginfo('publishing right trajectory')
+    armTrajectoryPublisher.publish(msgA)
+
+
+def appendTrajectoryPoint(arm_trajectory, time, positions):
+    if not arm_trajectory.joint_trajectory_messages:
+        arm_trajectory.joint_trajectory_messages = [copy.deepcopy(OneDoFJointTrajectoryRosMessage()) for i in range(len(positions))]
+    for i, pos in enumerate(positions):
+        point = TrajectoryPoint1DRosMessage()
+        point.time = time
+        point.position = pos
+        point.velocity = 0
+        arm_trajectory.joint_trajectory_messages[i].trajectory_points.append(point)
+    return arm_trajectory
+
 #=========================================================================================================
 # Callbacks
 #=========================================================================================================
@@ -207,6 +242,7 @@ if __name__ == '__main__':
         
     try:
         rospy.init_node('ihmc_walk_test')
+        
         if not rospy.has_param('/ihmc_ros/robot_name'):
             rospy.logerr("Missing parameter '/ihmc_ros/robot_name'")
         else:
@@ -217,6 +253,7 @@ if __name__ == '__main__':
             left_foot_frame_parameter_name = "/ihmc_ros/{0}/left_foot_frame_name".format(ROBOT_NAME)
 
             if rospy.has_param(right_foot_frame_parameter_name) and rospy.has_param(left_foot_frame_parameter_name):
+                rospy.loginfo('Foot Parameters Found.')
                 RIGHT_FOOT_FRAME_NAME = rospy.get_param(right_foot_frame_parameter_name)
                 LEFT_FOOT_FRAME_NAME = rospy.get_param(left_foot_frame_parameter_name)
 
@@ -225,11 +262,14 @@ if __name__ == '__main__':
                 #-------------------------------------------------------------------------
                 footStepStatusSubscriber = rospy.Subscriber("/ihmc_ros/{0}/output/footstep_status".format(ROBOT_NAME), FootstepStatusRosMessage, footStepStatus_callback)
                 lidarScanRangeSubcriber = rospy.Subscriber('/multisense/lidar_scan'.format(ROBOT_NAME), LaserScan, scan_callback)
+                rospy.loginfo('Subscribers Initiated.')
 
                 #-------------------------------------------------------------------------
                 # Publishers
                 #-------------------------------------------------------------------------
                 footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=1)
+                armTrajectoryPublisher = rospy.Publisher("/ihmc_ros/{0}/control/arm_trajectory".format(ROBOT_NAME), ArmTrajectoryRosMessage, queue_size=1)
+                rospy.loginfo('Publishers Initiated.')
 
                 tfBuffer = tf2_ros.Buffer()
                 tfListener = tf2_ros.TransformListener(tfBuffer)
@@ -245,6 +285,11 @@ if __name__ == '__main__':
                 while footStepListPublisher.get_num_connections() == 0:
                     rate.sleep()
 
+            if armTrajectoryPublisher.get_num_connections() == 0:
+                rospy.loginfo('waiting for subscriber...')
+                while armTrajectoryPublisher.get_num_connections() == 0:
+                    rate.sleep()
+
             #-------------------------------------------------------------------------
             # Initiate walking forwards.
             #-------------------------------------------------------------------------
@@ -253,21 +298,22 @@ if __name__ == '__main__':
                 # Walk up to door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking towards door...')
-                walkToLocation(16, True)
+                walkToLocation(17, True)
                 rospy.loginfo('Arrived at door.')
                 
                 #---------------------------------------------------------------------
                 # Push Button Here.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin push door button...')
-                time.sleep(30)
+                sendRightArmTrajectory()
+                time.sleep(2)
                 rospy.loginfo('Door is open.')
 
                 #---------------------------------------------------------------------
                 # Walk through the door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking through door...')
-                walkToLocation(12, False)
+                #walkToLocation(12, False)
                 rospy.loginfo('Qual Task #2 Complete.')
 
                 

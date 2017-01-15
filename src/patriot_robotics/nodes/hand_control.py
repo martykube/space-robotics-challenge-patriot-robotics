@@ -164,7 +164,11 @@ class HandControl:
 
         msg.robot_side = in_msg.data
 
-        rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
+        if self.LEFT == in_msg.data:
+            rest_state = [0.0, -1.5, 0.0, -2.0, 0.0, 0.0, 0.0]
+        else:
+            rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
+        
         msg = self.appendArmTrajectoryPoint(msg, 1.0, rest_state)
  
         msg.execution_mode = ArmTrajectoryRosMessage.OVERRIDE
@@ -203,6 +207,7 @@ class HandControl:
 
         rospy.loginfo('publishing right trajectory')
         self.armTrajectoryPublisher.publish(msg)
+               
 
 if __name__ == '__main__':
     rospy.init_node("hand_control")

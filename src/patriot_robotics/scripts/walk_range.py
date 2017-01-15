@@ -38,6 +38,7 @@ STEP_OFFSET_MINOR = 0.2
 STEP_OFFSET_MAJOR = 0.4
 LEFT_FOOT_FRAME_NAME = None
 RIGHT_FOOT_FRAME_NAME = None
+FOOT_ORIENTATION = Quaternion(x=0, y=0, z=0, w=1)
 
 #=========================================================================================================
 # Supporting Methods
@@ -68,7 +69,7 @@ def crossDoorThreshold():
     waitForFootstepCompletion()
     rospy.loginfo("Step finished.")
     msg.footstep_data_list[:] = []
-
+    
     footstepRight = createFootStepInPlace(RIGHT)
     footstepRight.location.x += forward_offset
     footstepRight.location.y = door_center_y + (-foot_separation/2.0)
@@ -99,10 +100,53 @@ def crossDoorThreshold():
     msg.unique_id = rospy.Time.now().nsecs
     footStepListPublisher.publish(msg)
     waitForFootstepCompletion()
-    rospy.loginfo("Step finished.")
+    rospy.loginfo("Steps finished.")
     msg.footstep_data_list[:] = []
 
     return
+
+def setFeet(both_x = 0.02, right_y=-0.12, foot_separation=0.25):
+    rospy.loginfo('Setting feet to fixed position.')
+    
+    right_footstep = FootstepDataRosMessage()
+    right_footstep.robot_side = RIGHT
+    right_footstep.orientation = FOOT_ORIENTATION
+    right_footstep.location = Vector3(x=both_x, y=right_y, z=0)
+
+    left_footstep = FootstepDataRosMessage()
+    left_footstep.robot_side = LEFT
+    left_footstep.orientation = FOOT_ORIENTATION
+    left_footstep.location = Vector3(x=both_x, y=right_y + foot_separation, z=0)
+
+    right_current = createFootStepInPlace(RIGHT)
+
+    if right_current.location.y > right_y:
+        first_footstep = right_footstep
+        second_footstep = left_footstep
+    else:
+        first_footstep = left_footstep
+        second_footstep = right_footstep
+
+    msg = FootstepDataListRosMessage()
+
+    # ----- Default Value: 1.5
+    msg.transfer_time = 1.5
+    msg.swing_time = 1.5
+    msg.execution_mode = FootstepDataListRosMessage.OVERRIDE
+
+    msg.unique_id = rospy.Time.now().nsecs
+    msg.footstep_data_list.append(first_footstep)
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion()
+    msg.footstep_data_list[:] = []     
+
+    msg.unique_id = rospy.Time.now().nsecs
+    msg.footstep_data_list.append(second_footstep)
+    footStepListPublisher.publish(msg)
+    waitForFootstepCompletion()
+    msg.footstep_data_list[:] = []   
+
+    return left_footstep, right_footstep
 
 def walkToLocation(num_steps, separate_feet):
     global stepDistance
@@ -111,7 +155,7 @@ def walkToLocation(num_steps, separate_feet):
     # ----- Default Value: 1.5
     msg.transfer_time = 0.7
     msg.swing_time = 0.7
-    msg.execution_mode = FootstepDataListRosMessage.OVERRIDE
+    msg.execution_mode = FootstepDataListRosMessage.QUEUE
     msg.unique_id = rospy.Time.now().nsecs
 
     stepCounter = 0
@@ -335,10 +379,18 @@ if __name__ == '__main__':
             time.sleep(15)  # because otherwise this message doesn't always get through
 
             # put a little debug in here
-            yLeft = createFootStepInPlace(LEFT).location.y
-            yRight = createFootStepInPlace(RIGHT).location.y
-            rospy.loginfo('Starting foot separation: {0}'.format(yLeft - yRight))
-            rospy.loginfo('Starting left foot in y: {0}'.format(yLeft))
+            right_footstep = createFootStepInPlace(RIGHT)
+            locLeft = createFootStepInPlace(LEFT).location
+            locRight = right_footstep.location
+            rospy.loginfo('Starting foot separation: {0}'.format(locLeft.y - locRight.y))
+            rospy.loginfo('Starting right foot in x: {0}'.format(locRight.x))
+            rospy.loginfo('Starting right foot in y: {0}'.format(locRight.y))
+            rospy.loginfo('Foot orientation: {0}:'.format(right_footstep.orientation))
+
+            #--------------------------------------------------
+            # Put feet in a known, good location to start.
+            #--------------------------------------------------            
+            left_footstep, right_footstep = setFeet()
 
             #-------------------------------------------------------------------------
             # Initiate walking forwards.
@@ -348,7 +400,7 @@ if __name__ == '__main__':
                 # Walk up to door.
                 #---------------------------------------------------------------------
                 rospy.loginfo('Begin walking towards door...')
-                walkToLocation(14, True)
+                walkToLocation(14, False)
                 rospy.loginfo('Arrived at door.')
 
                 # put a little debug in here

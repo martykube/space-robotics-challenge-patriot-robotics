@@ -429,7 +429,7 @@ if __name__ == '__main__':
                 crossDoorThreshold()
 
                 rospy.loginfo('Begin walking through door...')
-                walkToLocation(13, False)
+                walkToLocation(6, False)
                 rospy.loginfo('Qual Task #2 Complete.')
                
     except rospy.ROSInterruptException:

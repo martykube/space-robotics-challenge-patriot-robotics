@@ -11,9 +11,14 @@ from ihmc_msgs.msg import ArmTrajectoryRosMessage
 from ihmc_msgs.msg import OneDoFJointTrajectoryRosMessage
 from ihmc_msgs.msg import TrajectoryPoint1DRosMessage
 
+# ZERO_VECTOR = [0.0, -1.0, 2.0, 1.0, 0.0, 0.0, 0.0]
+# ELBOW_BENT_UP = [math.pi/6, 0.0, 0.0, math.pi/6, 0.0, 0.0, 0.0]
+# NORMAL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
 ZERO_VECTOR = [0.0, -1.0, 2.0, 1.0, 0.0, 0.0, 0.0]
-ELBOW_BENT_UP = [math.pi/6, 0.0, 0.0, math.pi/6, 0.0, 0.0, 0.0]
+#ELBOW_BENT_UP = [-0.3, 0.0, 0.0, 0.9, 0.0, 0.0, 0.0]
 NORMAL = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
 
 ROBOT_NAME = None
 
@@ -22,10 +27,10 @@ def sendRightArmTrajectory():
 
     msg.robot_side = ArmTrajectoryRosMessage.RIGHT
 
-    msg = appendTrajectoryPoint(msg, 2.0, ZERO_VECTOR)
-    msg = appendTrajectoryPoint(msg, 3.0, ELBOW_BENT_UP)
+#    msg = appendTrajectoryPoint(msg, 2.0, ZERO_VECTOR)
+#    msg = appendTrajectoryPoint(msg, 3.0, ELBOW_BENT_UP)
 #    msg = appendTrajectoryPoint(msg, 4.0, ZERO_VECTOR)
-    #msg = appendTrajectoryPoint(msg, 4.0, NORMAL)
+    msg = appendTrajectoryPoint(msg, 4.0, NORMAL)
 
     msg.unique_id = -1
 

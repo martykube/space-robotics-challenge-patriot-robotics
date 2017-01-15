@@ -326,9 +326,9 @@ if __name__ == '__main__':
                 #-------------------------------------------------------------------------
                 # Publishers
                 #-------------------------------------------------------------------------
-                footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=1)
+                footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=5)
                 buttonPressPublisher = rospy.Publisher("/patriot_robotics/button_press", Empty, queue_size=5)
-                armResetPublisher = rospy.Publisher("/patriot_robotics/reset_hand", UInt8, queue_size=1)
+                armResetPublisher = rospy.Publisher("/patriot_robotics/reset_hand", UInt8, queue_size=5)
                 rospy.loginfo('Publishers Initiated.')
             else:
                 rospy.logerr('Required parameters for subscribers missing!')
@@ -372,7 +372,7 @@ if __name__ == '__main__':
             rospy.loginfo('Starting foot separation: {0}'.format(locLeft.y - locRight.y))
             rospy.loginfo('Starting right foot in x: {0}'.format(locRight.x))
             rospy.loginfo('Starting right foot in y: {0}'.format(locRight.y))
-            rospy.loginfo('Foot orientation: {0}:'.format(right_footstep.orientation))
+            # rospy.loginfo('Foot orientation: {0}:'.format(right_footstep.orientation))
 
             #--------------------------------------------------
             # Put feet in a known, good location to start.
@@ -394,8 +394,8 @@ if __name__ == '__main__':
                 xLeft = createFootStepInPlace(LEFT).location.x
                 rospy.loginfo('Button press location in x: {0}'.format(xLeft))
 
-                # without this, it appears subsequent messages don't get through
-                time.sleep(15)
+                # necessary for button message to get through (sigh)
+                time.sleep(5)
                          
                 #---------------------------------------------------------------------
                 # Push Button Here.
@@ -403,7 +403,8 @@ if __name__ == '__main__':
                 rospy.loginfo('Begin push door button...')
                 # sendRightArmTrajectory() # includes reset
                 buttonPressPublisher.publish(Empty())
-                time.sleep(15)
+                # wait for press to actually happen
+                time.sleep(10)
                 rospy.loginfo('Door is open.')
                 
                 #---------------------------------------------------------------------

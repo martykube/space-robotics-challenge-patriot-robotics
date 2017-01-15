@@ -46,21 +46,22 @@ def crossDoorThreshold():
     msg = FootstepDataListRosMessage()
 
     # ----- Default Value: 1.5
-    msg.transfer_time = 1.5
-    msg.swing_time = 1.5
+    msg.transfer_time = 0.7
+    msg.swing_time = 0.7
     msg.execution_mode = FootstepDataListRosMessage.OVERRIDE
     msg.unique_id = rospy.Time.now().nsecs
 
     forward_offset = 0.6
     door_center_y = -0.005 # where the door is centered in the world
-    foot_separation = 0.18 # when the robot is dropped in world, it is 0.18
+    foot_separation = 0.19 # when the robot is dropped in world, it is 0.18
+    walking_foot_separation = 0.25 # our usual "walking" separation
     # threshold_height = 0.05
 
-    footstep = createFootStepInPlace(LEFT)
-    footstep.location.x += forward_offset/2.0
-    footstep.location.y = door_center_y + (foot_separation/2.0)
+    footstepLeft = createFootStepInPlace(LEFT)
+    footstepLeft.location.x += forward_offset/2.0
+    footstepLeft.location.y = door_center_y + (foot_separation/2.0)
 
-    msg.footstep_data_list.append(footstep)
+    msg.footstep_data_list.append(footstepLeft)
     rospy.loginfo("Stepping half-step left.")
     msg.unique_id = rospy.Time.now().nsecs
     footStepListPublisher.publish(msg)
@@ -68,11 +69,11 @@ def crossDoorThreshold():
     rospy.loginfo("Step finished.")
     msg.footstep_data_list[:] = []
 
-    footstep = createFootStepInPlace(RIGHT)
-    footstep.location.x += forward_offset
-    footstep.location.y = door_center_y + (-foot_separation/2.0)
+    footstepRight = createFootStepInPlace(RIGHT)
+    footstepRight.location.x += forward_offset
+    footstepRight.location.y = door_center_y + (-foot_separation/2.0)
         
-    msg.footstep_data_list.append(footstep)
+    msg.footstep_data_list.append(footstepRight)
     msg.unique_id = rospy.Time.now().nsecs
     rospy.loginfo("Stepping right.")
     footStepListPublisher.publish(msg)
@@ -80,16 +81,21 @@ def crossDoorThreshold():
     rospy.loginfo("Step finished.")
     msg.footstep_data_list[:] = []
 
-    msg.footstep_data_list.append(createFootStepOffset(LEFT, [forward_offset, 0.0, 0.0]))
-    msg.unique_id = rospy.Time.now().nsecs
     rospy.loginfo("Stepping left.")
+    footstepLeft.location.x += forward_offset
+
+    msg.footstep_data_list.append(footstepLeft)
+    msg.unique_id = rospy.Time.now().nsecs
     footStepListPublisher.publish(msg)
     waitForFootstepCompletion()
     rospy.loginfo("Step finished.")
     msg.footstep_data_list[:] = []
 
-    rospy.loginfo("Stepping half-step right.")
-    msg.footstep_data_list.append(createFootStepOffset(RIGHT, [forward_offset/2.0, 0.0, 0.0]))
+    rospy.loginfo("Stepping half-step right plus offset.")
+    footstepRight.location.x += forward_offset/2.0
+    footstepRight.location.y -= walking_foot_separation - foot_separation
+
+    msg.footstep_data_list.append(footstepRight)
     msg.unique_id = rospy.Time.now().nsecs
     footStepListPublisher.publish(msg)
     waitForFootstepCompletion()
@@ -326,13 +332,13 @@ if __name__ == '__main__':
 
             rospy.loginfo('Re-position Left Arm...')
             armResetPublisher.publish(LEFT)
+            time.sleep(15)  # because otherwise this message doesn't always get through
 
-            '''
             # put a little debug in here
             yLeft = createFootStepInPlace(LEFT).location.y
             yRight = createFootStepInPlace(RIGHT).location.y
             rospy.loginfo('Starting foot separation: {0}'.format(yLeft - yRight))
-            '''
+            rospy.loginfo('Starting left foot in y: {0}'.format(yLeft))
 
             #-------------------------------------------------------------------------
             # Initiate walking forwards.
@@ -344,6 +350,10 @@ if __name__ == '__main__':
                 rospy.loginfo('Begin walking towards door...')
                 walkToLocation(14, True)
                 rospy.loginfo('Arrived at door.')
+
+                # put a little debug in here
+                xLeft = createFootStepInPlace(LEFT).location.x
+                rospy.loginfo('Button press location in x: {0}'.format(xLeft))
 
                 # without this, it appears subsequent messages don't get through
                 time.sleep(15)

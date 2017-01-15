@@ -113,7 +113,6 @@ class HandControl:
 
         if hand_side == self.LEFT:
             q1 = tf.transformations.quaternion_about_axis(-numpy.pi/2, z_axis_unit)
-
         else:
             q1 = tf.transformations.quaternion_about_axis(numpy.pi/2, z_axis_unit)
            
@@ -168,7 +167,7 @@ class HandControl:
             rest_state = [0.0, -1.5, 0.0, -2.0, 0.0, 0.0, 0.0]
         else:
             rest_state = [0.0, 1.5, 0.0, 2.0, 0.0, 0.0, 0.0]
-        
+
         msg = self.appendArmTrajectoryPoint(msg, 1.0, rest_state)
  
         msg.execution_mode = ArmTrajectoryRosMessage.OVERRIDE
@@ -207,7 +206,6 @@ class HandControl:
 
         rospy.loginfo('publishing right trajectory')
         self.armTrajectoryPublisher.publish(msg)
-               
 
 if __name__ == '__main__':
     rospy.init_node("hand_control")

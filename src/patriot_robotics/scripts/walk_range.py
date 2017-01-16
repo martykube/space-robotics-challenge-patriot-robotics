@@ -90,7 +90,7 @@ def setFeet(both_x = 0.15, right_y=-0.12, foot_separation=0.25):
 '''
 Defaults here are sensible, but tweaks and experiments are encouraged!
 '''
-def walkForward(distance, step_size=0.6, transfer_time=0.6, swing_time=0.6, allowed_delta=0.01):
+def walkForward(distance, step_size=0.7, transfer_time=0.5, swing_time=0.5, allowed_delta=0.01):
     #distance, step_size=0.4, transfer_time=0.7, swing_time=0.7, allowed_delta=0.01
     msg = FootstepDataListRosMessage()
     
@@ -239,6 +239,7 @@ if __name__ == '__main__':
         footStepListPublisher = rospy.Publisher("/ihmc_ros/{0}/control/footstep_list".format(ROBOT_NAME), FootstepDataListRosMessage, queue_size=5)
         buttonPressPublisher = rospy.Publisher("/patriot_robotics/button_press", Empty, queue_size=5)
         armResetPublisher = rospy.Publisher("/patriot_robotics/reset_hand", UInt8, queue_size=5)
+        armPrePosPublisher = rospy.Publisher("/patriot_robotics/right_arm_pre_pos", Empty, queue_size=5)
         rospy.loginfo('Publishers Initiated.')
 
         tfBuffer = tf2_ros.Buffer()
@@ -270,7 +271,14 @@ if __name__ == '__main__':
         #---------------------------------------------------------------------
         rospy.loginfo('Re-position Left Arm...')
         armResetPublisher.publish(LEFT)
-        time.sleep(15)  # because otherwise this message doesn't always get through
+        time.sleep(10)  # because otherwise this message doesn't always get through
+
+        #---------------------------------------------------------------------
+        # Pre-position right arm so it is ready to push button.
+        #---------------------------------------------------------------------
+        rospy.loginfo('Pre-position Right Arm...')
+        armResetPublisher.publish(RIGHT)
+        time.sleep(10)  # because otherwise this message doesn't always get through
 
         # put a little debug in here
         right_footstep = createFootStepInPlace(RIGHT)
@@ -315,7 +323,7 @@ if __name__ == '__main__':
             buttonPressPublisher.publish(Empty())
             rospy.loginfo('Wait for door press to happen...')
             # wait for press to actually happen
-            time.sleep(12)
+            time.sleep(5)
 
             #---------------------------------------------------------------------
             # Walk through the door.

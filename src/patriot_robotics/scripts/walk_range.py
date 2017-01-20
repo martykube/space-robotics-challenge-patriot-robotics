@@ -90,7 +90,7 @@ def setFeet(both_x = 0.15, right_y=-0.12, foot_separation=0.25):
 '''
 Defaults here are sensible, but tweaks and experiments are encouraged!
 '''
-def walkForward(distance, step_size=0.7, transfer_time=0.5, swing_time=0.5, allowed_delta=0.01):
+def walkForward(distance, step_size=0.8, transfer_time=0.4, swing_time=0.4, allowed_delta=0.01):
     #distance, step_size=0.4, transfer_time=0.7, swing_time=0.7, allowed_delta=0.01
     msg = FootstepDataListRosMessage()
     
@@ -200,14 +200,6 @@ def footStepStatus_callback(msg):
 # Main
 #=========================================================================================================
 if __name__ == '__main__':
-    min_dist = 0.0
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--min_d', help='Minimum distance from an object that the robot should come.', default=1.0)
-    args = vars(parser.parse_args())
-    
-    if args['min_d']:
-        min_dist = args['min_d']
-        
     try:
         rospy.init_node('ihmc_walk_test')
         
@@ -245,7 +237,7 @@ if __name__ == '__main__':
         tfBuffer = tf2_ros.Buffer()
         tfListener = tf2_ros.TransformListener(tfBuffer)
 
-        rate = rospy.Rate(10) # 10hz
+        rate = rospy.Rate(7) # 10hz
         time.sleep(1)
 
         #-------------------------------------------------------------------------
@@ -271,14 +263,14 @@ if __name__ == '__main__':
         #---------------------------------------------------------------------
         rospy.loginfo('Re-position Left Arm...')
         armResetPublisher.publish(LEFT)
-        time.sleep(10)  # because otherwise this message doesn't always get through
+        time.sleep(5)  # because otherwise this message doesn't always get through
 
         #---------------------------------------------------------------------
         # Pre-position right arm so it is ready to push button.
         #---------------------------------------------------------------------
         rospy.loginfo('Pre-position Right Arm...')
         armResetPublisher.publish(RIGHT)
-        time.sleep(10)  # because otherwise this message doesn't always get through
+        time.sleep(5)  # because otherwise this message doesn't always get through
 
         # put a little debug in here
         right_footstep = createFootStepInPlace(RIGHT)
@@ -306,7 +298,7 @@ if __name__ == '__main__':
             # TODO: Try tweaking this! Try non-default values for step size, swing_time, etc.
             # See function definition.
             #--------
-            walkForward(2.7)
+            walkForward(2.67)
             rospy.loginfo('Arrived at door.')
 
             # put a little debug in here
@@ -314,7 +306,7 @@ if __name__ == '__main__':
             rospy.loginfo('Button press location in x: {0}'.format(xLeft))
 
             # necessary for button message to get through (sigh)
-            time.sleep(5)
+            time.sleep(2)
 
             #---------------------------------------------------------------------
             # Push Button Here.
@@ -323,7 +315,7 @@ if __name__ == '__main__':
             buttonPressPublisher.publish(Empty())
             rospy.loginfo('Wait for door press to happen...')
             # wait for press to actually happen
-            time.sleep(5)
+            time.sleep(2)
 
             #---------------------------------------------------------------------
             # Walk through the door.
